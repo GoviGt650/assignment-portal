@@ -1,13 +1,32 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Download, ExternalLink, MessageSquare, X } from 'lucide-react';
+import {
+  Download,
+  ExternalLink,
+  Eye,
+  MessageSquare,
+  Search,
+  X,
+} from 'lucide-react';
 import PageHeader from '../../components/PageHeader';
 import { assignmentApi, submissionApi, downloadFile } from '../../services/api';
-import { formatDate } from '../../utils/helpers';
-import { DataTable, EmptyState, LoadingPage, NoticeCard, StatusBadge } from '../../components/UI';
+import { buildSubmissionDownloadName, formatDate } from '../../utils/helpers';
+import {
+  DataTable,
+  EmptyState,
+  FilePreviewModal,
+  FilterBar,
+  LoadingPage,
+  NoticeCard,
+  StatusSelect,
+  UserAvatar,
+} from '../../components/UI';
 
 const inputClass =
-  'rounded-xl border border-slate-200 bg-white px-4 py-2.5 outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10';
+  'rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10';
+
+const actionBtn =
+  'inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white p-2 text-slate-600 transition hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700';
 
 function FeedbackModal({ submission, onClose, onSaved }) {
   const [feedback, setFeedback] = useState(submission.remarks || '');
@@ -25,7 +44,7 @@ function FeedbackModal({ submission, onClose, onSaved }) {
       setNotice({
         type: 'error',
         title: 'Could not save feedback',
-        message: err.message || 'Please check you are logged in as a teacher and try again.',
+        message: err.message || 'Please try again.',
       });
     } finally {
       setSaving(false);
@@ -36,46 +55,33 @@ function FeedbackModal({ submission, onClose, onSaved }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
       <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-          <div>
-            <h3 className="text-lg font-semibold text-slate-900">Add feedback</h3>
-            <p className="mt-0.5 text-sm text-slate-500">
-              {submission.username} · {submission.assignment_title}
-            </p>
+          <div className="flex items-center gap-3">
+            <UserAvatar name={submission.username} size="sm" />
+            <div>
+              <h3 className="text-lg font-semibold text-slate-900">Feedback</h3>
+              <p className="mt-0.5 text-sm text-slate-500">
+                {submission.username} · {submission.assignment_title}
+              </p>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-          >
+          <button type="button" onClick={onClose} className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
             <X size={18} />
           </button>
         </div>
         <div className="space-y-4 px-6 py-5">
           {notice && (
-            <NoticeCard
-              type={notice.type}
-              title={notice.title}
-              message={notice.message}
-              onDismiss={() => setNotice(null)}
-            />
+            <NoticeCard type={notice.type} title={notice.title} message={notice.message} onDismiss={() => setNotice(null)} />
           )}
           <textarea
             rows={5}
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
-            placeholder="Write feedback for the student (optional)..."
+            placeholder="Write feedback for the student..."
             className={`w-full resize-y ${inputClass}`}
           />
-          <p className="text-xs text-slate-500">
-            The student will see this on their submission history and assignment page.
-          </p>
         </div>
         <div className="flex justify-end gap-3 border-t border-slate-100 px-6 py-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
-          >
+          <button type="button" onClick={onClose} className="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100">
             Cancel
           </button>
           <button
@@ -100,10 +106,17 @@ export default function SubmissionList() {
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(true);
   const [feedbackTarget, setFeedbackTarget] = useState(null);
+  const [previewTarget, setPreviewTarget] = useState(null);
   const [notice, setNotice] = useState(null);
 
   const assignmentId = searchParams.get('assignment_id') || '';
   const selectedAssignment = assignments.find((a) => String(a.id) === assignmentId);
+
+  const stats = useMemo(() => ({
+    total: items.length,
+    reviewed: items.filter((s) => s.status === 'reviewed').length,
+    withFeedback: items.filter((s) => s.remarks).length,
+  }), [items]);
 
   useEffect(() => {
     assignmentApi.list({ limit: 100 })
@@ -113,11 +126,8 @@ export default function SubmissionList() {
 
   const handleAssignmentFilter = (value) => {
     const next = new URLSearchParams(searchParams);
-    if (value) {
-      next.set('assignment_id', value);
-    } else {
-      next.delete('assignment_id');
-    }
+    if (value) next.set('assignment_id', value);
+    else next.delete('assignment_id');
     setSearchParams(next);
   };
 
@@ -155,47 +165,26 @@ export default function SubmissionList() {
     setNotice(null);
     try {
       await submissionApi.updateStatus(id, { status: newStatus });
-      setNotice({
-        type: 'success',
-        title: 'Status updated',
-        message: 'The submission status was saved successfully.',
-      });
+      setNotice({ type: 'success', title: 'Status updated', message: 'Submission status saved.' });
       load();
     } catch (err) {
-      setNotice({
-        type: 'error',
-        title: 'Could not update status',
-        message: err.message,
-      });
+      setNotice({ type: 'error', title: 'Could not update status', message: err.message });
     }
   };
 
-  const handleDownload = async (url) => {
+  const handleDownload = async (submission) => {
     setNotice(null);
     try {
-      const filename = url.split('/').pop();
-      await downloadFile(url, filename);
-      setNotice({
-        type: 'success',
-        title: 'Download started',
-        message: 'The submission file is downloading to your device.',
-      });
+      const filename = buildSubmissionDownloadName(
+        submission.username,
+        submission.assignment_title,
+        submission.uploaded_file
+      );
+      await downloadFile(submission.uploaded_file, filename);
+      setNotice({ type: 'success', title: 'Download started', message: `Saving as ${filename}` });
     } catch {
-      setNotice({
-        type: 'error',
-        title: 'Download failed',
-        message: 'Could not download the file. Please try again.',
-      });
+      setNotice({ type: 'error', title: 'Download failed', message: 'Could not download the file.' });
     }
-  };
-
-  const handleFeedbackSaved = () => {
-    setNotice({
-      type: 'success',
-      title: 'Feedback saved',
-      message: 'The student can now see your feedback on their submission.',
-    });
-    load();
   };
 
   return (
@@ -205,40 +194,32 @@ export default function SubmissionList() {
         title="Submissions"
         subtitle={
           selectedAssignment
-            ? `Showing submissions for "${selectedAssignment.title}" only.`
-            : 'Search, review, and download student submissions.'
+            ? `Reviewing "${selectedAssignment.title}".`
+            : 'Review, download, and leave feedback on student work.'
         }
       />
 
       {notice && (
-        <NoticeCard
-          type={notice.type}
-          title={notice.title}
-          message={notice.message}
-          onDismiss={() => setNotice(null)}
-        />
+        <NoticeCard type={notice.type} title={notice.title} message={notice.message} onDismiss={() => setNotice(null)} />
       )}
 
-      <div className="flex flex-wrap gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
-        <select
-          value={assignmentId}
-          onChange={(e) => handleAssignmentFilter(e.target.value)}
-          className={`min-w-[220px] ${inputClass}`}
-        >
+      <FilterBar>
+        <select value={assignmentId} onChange={(e) => handleAssignmentFilter(e.target.value)} className={`min-w-[220px] ${inputClass}`}>
           <option value="">All assignments</option>
           {assignments.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.title} ({a.submission_count || 0})
-            </option>
+            <option key={a.id} value={a.id}>{a.title} ({a.submission_count || 0})</option>
           ))}
         </select>
-        <input
-          type="search"
-          placeholder="Search by student or assignment..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className={`min-w-[240px] flex-1 ${inputClass}`}
-        />
+        <div className="relative min-w-[240px] flex-1">
+          <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-600" />
+          <input
+            type="search"
+            placeholder="Search student or assignment..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className={`w-full pl-10 ${inputClass}`}
+          />
+        </div>
         <select value={status} onChange={(e) => setStatus(e.target.value)} className={inputClass}>
           <option value="">All statuses</option>
           <option value="submitted">Submitted</option>
@@ -247,74 +228,95 @@ export default function SubmissionList() {
           <option value="pending">Pending</option>
         </select>
         {hasActiveFilters && (
-          <button
-            type="button"
-            onClick={clearFilters}
-            className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
-          >
+          <button type="button" onClick={clearFilters} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
             Clear filters
           </button>
         )}
-      </div>
+      </FilterBar>
+
+      {!loading && items.length > 0 && (
+        <p className="text-sm text-slate-500">
+          <span className="font-semibold text-slate-700">{stats.total}</span> submissions
+          {' · '}
+          <span className="font-semibold text-slate-700">{stats.reviewed}</span> reviewed
+          {' · '}
+          <span className="font-semibold text-slate-700">{stats.withFeedback}</span> with feedback
+        </p>
+      )}
 
       {loading ? (
         <LoadingPage />
       ) : items.length === 0 ? (
         <EmptyState
           title="No submissions found"
-          description={
-            hasActiveFilters
-              ? 'No submissions match the current filters. Try clearing filters or choosing another assignment.'
-              : 'Submissions will appear here once students submit their work.'
-          }
+          description={hasActiveFilters ? 'Try adjusting your filters.' : 'Submissions appear here when students submit work.'}
         />
       ) : (
         <DataTable columns={['Student', 'Assignment', 'Submitted', 'Status', 'Feedback', 'Actions']}>
           {items.map((s) => (
             <tr key={s.id} className="transition hover:bg-slate-50/80">
-              <td className="px-6 py-4 font-medium text-slate-900">{s.username}</td>
-              <td className="px-6 py-4 text-slate-600">{s.assignment_title}</td>
-              <td className="px-6 py-4 text-slate-600">{formatDate(s.submitted_at)}</td>
-              <td className="px-6 py-4"><StatusBadge status={s.status} /></td>
-              <td className="px-6 py-4">
+              <td className="px-4 py-3">
+                <div className="flex items-center gap-2.5">
+                  <UserAvatar name={s.username} size="sm" />
+                  <span className="font-medium text-slate-900">{s.username}</span>
+                </div>
+              </td>
+              <td className="px-4 py-3 text-slate-600">{s.assignment_title}</td>
+              <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-500">{formatDate(s.submitted_at)}</td>
+              <td className="px-4 py-3">
+                <StatusSelect
+                  value={s.status}
+                  onChange={(e) => updateStatus(s.id, e.target.value)}
+                />
+              </td>
+              <td className="max-w-[180px] px-4 py-3">
                 {s.remarks ? (
-                  <p className="max-w-[200px] truncate text-sm text-slate-600" title={s.remarks}>
-                    {s.remarks}
-                  </p>
+                  <p className="truncate text-sm text-slate-600" title={s.remarks}>{s.remarks}</p>
                 ) : (
                   <span className="text-sm text-slate-400">—</span>
                 )}
               </td>
-              <td className="px-6 py-4">
-                <div className="flex flex-wrap items-center gap-3">
+              <td className="px-4 py-3">
+                <div className="flex items-center gap-1">
                   <button
                     type="button"
                     onClick={() => setFeedbackTarget(s)}
-                    className="inline-flex items-center gap-1 font-semibold text-brand-600 hover:underline"
+                    title={s.remarks ? 'Edit feedback' : 'Add feedback'}
+                    className={actionBtn}
                   >
-                    <MessageSquare size={14} />
-                    {s.remarks ? 'Edit feedback' : 'Add feedback'}
+                    <MessageSquare size={15} />
                   </button>
+                  {s.uploaded_file && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewTarget(s)}
+                        title="Preview submission"
+                        className={actionBtn}
+                      >
+                        <Eye size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDownload(s)}
+                        title="Download file"
+                        className={actionBtn}
+                      >
+                        <Download size={15} />
+                      </button>
+                    </>
+                  )}
                   {s.github_url && (
-                    <a href={s.github_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-brand-600 hover:underline">
-                      <ExternalLink size={14} /> GitHub
+                    <a
+                      href={s.github_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      title="Open GitHub"
+                      className={actionBtn}
+                    >
+                      <ExternalLink size={15} />
                     </a>
                   )}
-                  {s.uploaded_file && (
-                    <button type="button" onClick={() => handleDownload(s.uploaded_file)} className="inline-flex items-center gap-1 font-semibold text-brand-600 hover:underline">
-                      <Download size={14} /> File
-                    </button>
-                  )}
-                  <select
-                    value={s.status}
-                    onChange={(e) => updateStatus(s.id, e.target.value)}
-                    className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs outline-none focus:border-brand-500"
-                  >
-                    <option value="submitted">Submitted</option>
-                    <option value="reviewed">Reviewed</option>
-                    <option value="late">Late</option>
-                    <option value="pending">Pending</option>
-                  </select>
                 </div>
               </td>
             </tr>
@@ -322,11 +324,28 @@ export default function SubmissionList() {
         </DataTable>
       )}
 
+      {previewTarget && (
+        <FilePreviewModal
+          url={previewTarget.uploaded_file}
+          title={`${previewTarget.username}'s submission`}
+          subtitle={previewTarget.assignment_title}
+          downloadName={buildSubmissionDownloadName(
+            previewTarget.username,
+            previewTarget.assignment_title,
+            previewTarget.uploaded_file
+          )}
+          onClose={() => setPreviewTarget(null)}
+        />
+      )}
+
       {feedbackTarget && (
         <FeedbackModal
           submission={feedbackTarget}
           onClose={() => setFeedbackTarget(null)}
-          onSaved={handleFeedbackSaved}
+          onSaved={() => {
+            setNotice({ type: 'success', title: 'Feedback saved', message: 'The student can now see your feedback.' });
+            load();
+          }}
         />
       )}
     </div>

@@ -1,5 +1,12 @@
-import { STATUS_LABELS, statusColor } from '../utils/helpers';
-import { AlertCircle, CheckCircle2, Info, X, XCircle } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import {
+  STATUS_LABELS,
+  detectPreviewKind,
+  statusColor,
+  statusSelectClass,
+} from '../utils/helpers';
+import { AlertCircle, Calendar, CheckCircle2, Download, FileArchive, Filter, Info, X, XCircle } from 'lucide-react';
+import { downloadFile, fetchFileBlob } from '../services/api';
 
 const noticeStyles = {
   success: {
@@ -119,6 +126,137 @@ export function FilePicker({ label, hint, accept, onChange, fileName, multiple, 
   );
 }
 
+export function DatePickerField({ value, onChange, min, shortcuts = [] }) {
+  const inputRef = useRef(null);
+
+  const openPicker = () => {
+    const input = inputRef.current;
+    if (!input) return;
+    try {
+      if (typeof input.showPicker === 'function') {
+        input.showPicker();
+      } else {
+        input.focus();
+        input.click();
+      }
+    } catch {
+      input.focus();
+      input.click();
+    }
+  };
+
+  const display = value
+    ? new Date(`${value}T12:00:00`).toLocaleDateString(undefined, {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    })
+    : 'Choose a due date';
+
+  return (
+    <div className="space-y-3">
+      <input
+        ref={inputRef}
+        type="date"
+        value={value}
+        min={min}
+        onChange={onChange}
+        required
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden="true"
+      />
+
+      <button
+        type="button"
+        onClick={openPicker}
+        className="group w-full cursor-pointer text-left"
+      >
+        <div className="flex items-center gap-4 rounded-2xl border border-brand-100 bg-gradient-to-br from-brand-50/60 via-white to-white p-4 transition hover:border-brand-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/10">
+          <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-brand-600 text-white shadow-md shadow-brand-600/20">
+            {value ? (
+              <>
+                <span className="text-[10px] font-semibold uppercase leading-none opacity-90">
+                  {new Date(`${value}T12:00:00`).toLocaleDateString(undefined, { month: 'short' })}
+                </span>
+                <span className="mt-0.5 text-lg font-bold leading-none">
+                  {new Date(`${value}T12:00:00`).getDate()}
+                </span>
+              </>
+            ) : (
+              <Calendar size={20} />
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold uppercase tracking-wide text-brand-700">Due date</p>
+            <p className={`mt-1 text-sm font-semibold ${value ? 'text-slate-900' : 'text-slate-400'}`}>
+              {display}
+            </p>
+            <p className="mt-0.5 text-xs text-slate-500">Submissions close at end of this day</p>
+          </div>
+          <span className="shrink-0 rounded-lg bg-brand-600 px-3 py-2 text-xs font-semibold text-white shadow-sm">
+            {value ? 'Change' : 'Select'}
+          </span>
+        </div>
+      </button>
+
+      {shortcuts.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {shortcuts.map((shortcut) => (
+            <button
+              key={shortcut.label}
+              type="button"
+              onClick={() => onChange({ target: { value: shortcut.value } })}
+              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                value === shortcut.value
+                  ? 'border-brand-600 bg-brand-600 text-white'
+                  : 'border-slate-200 bg-white text-slate-600 hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700'
+              }`}
+            >
+              {shortcut.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function UserAvatar({ name, size = 'md' }) {
+  const sizes = {
+    sm: 'h-9 w-9 rounded-lg text-sm',
+    md: 'h-11 w-11 rounded-xl text-base',
+    lg: 'h-14 w-14 rounded-2xl text-lg',
+  };
+
+  return (
+    <div className={`flex shrink-0 items-center justify-center bg-brand-600 font-bold text-white shadow-sm shadow-brand-600/20 ${sizes[size]}`}>
+      {name?.charAt(0)?.toUpperCase() || '?'}
+    </div>
+  );
+}
+
+export function IconBox({ icon: Icon, size = 18 }) {
+  return (
+    <div className="rounded-xl border border-brand-100 bg-brand-50 p-2.5 text-brand-600 shadow-sm">
+      <Icon size={size} />
+    </div>
+  );
+}
+
+export function FilterBar({ title = 'Filters', children }) {
+  return (
+    <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
+        <Filter size={16} className="text-brand-600" />
+        {title}
+      </div>
+      <div className="flex flex-wrap gap-3">{children}</div>
+    </div>
+  );
+}
+
 export function Spinner({ className = '' }) {
   return (
     <div className={`inline-block h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-r-transparent ${className}`} />
@@ -148,6 +286,137 @@ export function StatusBadge({ status }) {
     <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${statusColor(status)}`}>
       {label}
     </span>
+  );
+}
+
+const STATUS_OPTIONS = ['submitted', 'reviewed', 'late', 'pending'];
+
+export function StatusSelect({ value, onChange, className = '' }) {
+  return (
+    <select
+      value={value}
+      onChange={onChange}
+      className={`rounded-lg border px-2.5 py-1 text-xs font-semibold outline-none focus:ring-2 ${statusSelectClass(value)} ${className}`}
+    >
+      {STATUS_OPTIONS.map((option) => (
+        <option key={option} value={option} className="bg-white text-slate-800">
+          {STATUS_LABELS[option] || option}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+export function FilePreviewModal({ url, title, subtitle, downloadName, onClose }) {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [blobUrl, setBlobUrl] = useState(null);
+  const [contentType, setContentType] = useState('');
+  const [textPreview, setTextPreview] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    let objectUrl = null;
+
+    fetchFileBlob(url)
+      .then(async ({ blob, contentType: type }) => {
+        if (!active) return;
+        objectUrl = URL.createObjectURL(blob);
+        setBlobUrl(objectUrl);
+        setContentType(type);
+        const kind = detectPreviewKind(url, type);
+        if (kind === 'text') {
+          setTextPreview(await blob.text());
+        }
+      })
+      .catch((err) => {
+        if (active) setError(err.message || 'Could not preview file');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [url]);
+
+  const previewKind = detectPreviewKind(url, contentType);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+      <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+          <div>
+            <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+            {subtitle && <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>}
+          </div>
+          <div className="flex items-center gap-2">
+            {downloadName && (
+              <button
+                type="button"
+                onClick={() => downloadFile(url, downloadName)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                <Download size={15} />
+                Download
+              </button>
+            )}
+            <button type="button" onClick={onClose} className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        <div className="min-h-[320px] flex-1 overflow-auto bg-slate-50 p-4">
+          {loading && (
+            <div className="flex min-h-[280px] items-center justify-center">
+              <Spinner />
+            </div>
+          )}
+          {!loading && error && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+          )}
+          {!loading && !error && previewKind === 'pdf' && blobUrl && (
+            <iframe title={title} src={blobUrl} className="h-[70vh] w-full rounded-xl border border-slate-200 bg-white" />
+          )}
+          {!loading && !error && previewKind === 'image' && blobUrl && (
+            <div className="flex min-h-[280px] items-center justify-center">
+              <img src={blobUrl} alt={title} className="max-h-[70vh] max-w-full rounded-xl border border-slate-200 bg-white object-contain" />
+            </div>
+          )}
+          {!loading && !error && previewKind === 'text' && (
+            <pre className="overflow-auto rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-800">{textPreview}</pre>
+          )}
+          {!loading && !error && (previewKind === 'zip' || previewKind === 'other') && (
+            <div className="flex min-h-[280px] flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white px-6 text-center">
+              <div className="rounded-2xl bg-brand-50 p-4 text-brand-600">
+                <FileArchive size={32} />
+              </div>
+              <h4 className="mt-4 text-base font-semibold text-slate-900">
+                {previewKind === 'zip' ? 'ZIP archive preview' : 'Preview not available'}
+              </h4>
+              <p className="mt-2 max-w-md text-sm text-slate-500">
+                {previewKind === 'zip'
+                  ? 'This submission is a ZIP file containing the student\'s folder or files. Download it to view everything inside.'
+                  : 'This file type cannot be previewed in the browser. Download the file to open it on your device.'}
+              </p>
+              {downloadName && (
+                <button
+                  type="button"
+                  onClick={() => downloadFile(url, downloadName)}
+                  className="mt-5 inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                >
+                  <Download size={16} />
+                  Download file
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 

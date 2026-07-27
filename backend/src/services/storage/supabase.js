@@ -102,7 +102,8 @@ export async function deleteFile(type, filename) {
   await client.storage.from(bucket).remove([safeName]);
 }
 
-export async function streamFile(urlType, filename, res) {
+export async function streamFile(urlType, filename, res, options = {}) {
+  const { inline = false, downloadName } = options;
   const client = getClient();
   const safeName = path.basename(filename);
 
@@ -110,8 +111,14 @@ export async function streamFile(urlType, filename, res) {
   if (error || !data) return false;
 
   const buffer = Buffer.from(await data.arrayBuffer());
-  res.setHeader('Content-Type', data.type || 'application/octet-stream');
-  res.setHeader('Content-Disposition', `attachment; filename="${safeName}"`);
+  const contentType = data.type || 'application/octet-stream';
+  const outputName = downloadName || safeName;
+
+  res.setHeader('Content-Type', contentType);
+  res.setHeader(
+    'Content-Disposition',
+    `${inline ? 'inline' : 'attachment'}; filename="${outputName}"`
+  );
   res.send(buffer);
   return true;
 }

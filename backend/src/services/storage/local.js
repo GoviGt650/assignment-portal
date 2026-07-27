@@ -68,13 +68,43 @@ export async function deleteFile(type, filename) {
   }
 }
 
-export async function streamFile(urlType, filename, res) {
+function mimeTypeFor(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  const map = {
+    '.pdf': 'application/pdf',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.txt': 'text/plain',
+    '.md': 'text/markdown',
+    '.zip': 'application/zip',
+  };
+  return map[ext] || 'application/octet-stream';
+}
+
+export async function streamFile(urlType, filename, res, options = {}) {
+  const { inline = false, downloadName } = options;
   const dir = urlType === 'assignments' ? ASSIGNMENTS_DIR : SUBMISSIONS_DIR;
-  const filePath = path.join(dir, path.basename(filename));
+  const safeName = path.basename(filename);
+  const filePath = path.join(dir, safeName);
   if (!fsSync.existsSync(filePath)) {
     return false;
   }
-  res.download(filePath, path.basename(filename));
+
+  const contentType = mimeTypeFor(filePath);
+  const outputName = downloadName || safeName;
+  res.setHeader('Content-Type', contentType);
+
+  if (inline) {
+    res.setHeader('Content-Disposition', `inline; filename="${outputName}"`);
+    fsSync.createReadStream(filePath).pipe(res);
+    return true;
+  }
+
+  res.setHeader('Content-Disposition', `attachment; filename="${outputName}"`);
+  fsSync.createReadStream(filePath).pipe(res);
   return true;
 }
 

@@ -5,22 +5,25 @@ A centralized **Assignment Submission Portal (ASP)** for teachers and students. 
 ## Features
 
 ### Teacher
-- Secure login
-- Upload assignment PDFs with title, description, and deadline
-- View, edit, and delete assignments
-- Dashboard with stats (students, assignments, submissions)
-- View and search student submissions
-- Download submitted files and open GitHub links
-- Mark submission status (submitted, reviewed, late, pending)
+- Secure login and professional account settings (username/password)
+- Create assignments with PDF, description, and **date-only deadline**
+- Card-based assignment management with submission counts
+- Compact submissions table with **assignment filter**, search, and status filters
+- **Colored status** dropdown (pending, submitted, reviewed, late)
+- **Preview** student submissions (PDF, images, text; ZIP with download prompt)
+- **Download** submissions with filenames like `studentname_assignment-title.zip`
+- Add and edit **teacher feedback** visible to students
+- Download files and open GitHub links
 - Search students by username
 
 ### Student
 - Register with username and password
-- View active, pending, and completed assignments
-- Download assignment PDFs
+- Dashboard and **card-based** assignment list with status filters
+- **Preview** assignment PDF in browser before downloading
+- Download assignment PDFs with clean filenames (assignment title)
 - Submit ZIP, individual files, folder uploads, or GitHub URL
 - Update submission before deadline
-- View submission history and teacher remarks
+- View submission history and **teacher feedback**
 
 ## Tech Stack
 
@@ -30,7 +33,7 @@ A centralized **Assignment Submission Portal (ASP)** for teachers and students. 
 | Backend | Node.js, Express |
 | Database | PostgreSQL (Neon / Supabase / Docker) |
 | Auth | JWT + bcrypt |
-| Storage | Local filesystem (dev) — Cloudinary/Supabase ready |
+| Storage | Local filesystem (dev) / Supabase Storage (production) |
 
 ## Project Structure
 
@@ -95,6 +98,8 @@ npm run dev
 
 App runs at **http://localhost:5173**
 
+**Same WiFi testing:** With `host: true` in Vite, open the **Network** URL shown in the terminal (e.g. `http://192.168.x.x:5173`) on a phone or another laptop on the same WiFi.
+
 ## Environment Variables
 
 ### Backend (`backend/.env`)
@@ -112,7 +117,7 @@ App runs at **http://localhost:5173**
 
 | Variable | Description |
 |----------|-------------|
-| `VITE_API_URL` | Backend API base URL (e.g. `http://localhost:8000/api`) |
+| `VITE_API_URL` | Backend API base URL (use `/api` locally with Vite proxy) |
 
 ## API Endpoints
 
@@ -124,7 +129,10 @@ App runs at **http://localhost:5173**
 | GET | `/api/assignments` | List assignments |
 | POST | `/api/assignments` | Create assignment (teacher) |
 | GET | `/api/submissions` | List submissions |
+| PATCH | `/api/submissions/:id/feedback` | Teacher feedback on submission |
 | POST | `/api/submissions/assignment/:id` | Submit work (student) |
+| GET | `/api/files/assignments/:filename` | Download/preview assignment PDF |
+| GET | `/api/files/submissions/:filename` | Download/preview submission file |
 | GET | `/api/dashboard/teacher` | Teacher stats |
 | GET | `/api/dashboard/student` | Student stats |
 
@@ -149,7 +157,7 @@ Full interactive docs available at `/api/health`.
 3. Set `DATABASE_URL` on Render
 
 ### Storage
-For production, replace `backend/src/services/storageService.js` with Cloudinary or Supabase Storage integration.
+Production uses **Supabase Storage** (`STORAGE_TYPE=supabase`). See [docs/FREE_DEPLOYMENT_GUIDE.md](docs/FREE_DEPLOYMENT_GUIDE.md).
 
 ## Security Notes
 - Change `JWT_SECRET` and teacher password in production
@@ -160,7 +168,7 @@ For production, replace `backend/src/services/storageService.js` with Cloudinary
 ## Future Enhancements
 - Email notifications and deadline reminders
 - GitHub integration and auto-clone
-- Grading, feedback, and leaderboard
+- Grading rubrics and leaderboard
 - Batch management and announcements
 
 ## License

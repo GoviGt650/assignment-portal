@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import PageHeader from '../../components/PageHeader';
 import { assignmentApi, submissionApi } from '../../services/api';
-import { formatDate, isPastDeadline } from '../../utils/helpers';
+import { formatDateOnly, isPastDeadline } from '../../utils/helpers';
 import { FilePicker, FilterTabs, LoadingPage, NoticeCard, Panel } from '../../components/UI';
 
 export default function SubmitAssignment() {
@@ -101,7 +101,7 @@ export default function SubmitAssignment() {
       <PageHeader
         badge="Submit Work"
         title={assignment.title}
-        subtitle={`Deadline: ${formatDate(assignment.deadline)}`}
+        subtitle={`Due ${formatDateOnly(assignment.deadline)}`}
       />
 
       {notice && (

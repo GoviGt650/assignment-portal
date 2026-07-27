@@ -23,6 +23,7 @@
 15. [Running Locally](#15-running-locally)
 16. [Deployment Overview](#16-deployment-overview)
 17. [Study Checklist](#17-study-checklist)
+18. [UI Components & UX Features](#18-ui-components--ux-features)
 
 ---
 
@@ -36,14 +37,14 @@ Assignments were shared on WhatsApp as PDFs. Students downloaded files, pushed c
 
 | Role | Can Do |
 |------|--------|
-| **Teacher** | Upload assignments (PDF + deadline), view submissions, download files, mark status, manage account |
-| **Student** | Register, view assignments, download PDFs, submit ZIP/files/folder/GitHub URL, view history |
+| **Teacher** | Upload assignments (PDF + date deadline), manage assignments, review submissions with filters, preview/download files, set colored status, add feedback, manage profile |
+| **Student** | Register, browse assignments, preview/download PDFs, submit work, view history and teacher feedback |
 
 ### High-Level Flow
 
 ```
 Teacher uploads assignment → Student sees it on dashboard → Student submits work
-→ Teacher reviews submission → Teacher updates status (submitted / reviewed / late)
+→ Teacher reviews submission → Teacher updates status and adds feedback → Student reads feedback
 ```
 
 ---
@@ -70,7 +71,7 @@ This project follows a **client–server architecture** with a **REST API**:
 │       │                                                          │
 │       ├── JWT auth middleware                                    │
 │       ├── SQL queries (pg / sql.js)                              │
-│       └── Local file storage (uploads/)                          │
+│       └── File storage (local dev / Supabase in production)      │
 └──────────────────────────┬──────────────────────────────────────┘
                            │
               ┌────────────┴────────────┐
@@ -345,6 +346,30 @@ main.jsx
 
 On app load, if a token exists in `localStorage`, it calls `GET /auth/me` to restore the session.
 
+### Shared UI components (`components/UI.jsx`)
+
+Reusable building blocks used across teacher and student pages:
+
+| Component | Purpose |
+|-----------|---------|
+| `NoticeCard` | Info/success/warning/error banners with optional dismiss |
+| `FilePicker` | Drag-and-drop file input with validation hints |
+| `DatePickerField` | Date-only deadline picker (uses `showPicker()` on Windows) |
+| `ConfirmDialog` | Modal confirmation for destructive actions |
+| `IconBox` | Consistent icon container styling |
+| `FilterBar` | Search + filter controls for list pages |
+| `UserAvatar` | Initials-based avatar for usernames |
+| `StatusSelect` | Colored status dropdown (pending, submitted, reviewed, late) |
+| `FilePreviewModal` | Inline preview for PDF, images, and text; download prompt for ZIP/other |
+
+### Helper utilities (`utils/helpers.js`)
+
+| Function | Purpose |
+|----------|---------|
+| `dateInputToDeadlineISO()` | Converts date input to end-of-day ISO deadline |
+| `statusSelectClass()` | Tailwind classes per submission status |
+| `buildSubmissionDownloadName()` | Builds `{student}_{assignment-title}.{ext}` download names |
+
 ---
 
 ## 8. Frontend ↔ Backend Integration
@@ -353,8 +378,10 @@ On app load, if a token exists in `localStorage`, it calls `GET /auth/me` to res
 
 **Frontend** `.env`:
 ```
-VITE_API_URL=http://localhost:8000/api
+VITE_API_URL=/api
 ```
+
+Using `/api` with the Vite proxy avoids CORS issues in development. For production, set the full backend URL (e.g. `https://your-api.onrender.com/api`).
 
 **Backend** `.env`:
 ```
@@ -368,12 +395,17 @@ During development, Vite proxies API calls so the browser doesn't hit CORS issue
 
 ```javascript
 // frontend/vite.config.js
-proxy: {
-  '/api': { target: 'http://localhost:8000' }
+server: {
+  host: true,   // exposes Network URL for same-WiFi testing
+  proxy: {
+    '/api': { target: 'http://localhost:8000' }
+  }
 }
 ```
 
 So when frontend calls `/api/auth/login`, Vite forwards it to `http://localhost:8000/api/auth/login`.
+
+**Same-WiFi testing:** After `npm run dev`, Vite prints a **Network** URL (e.g. `http://192.168.x.x:5173`). Open it on a phone or another laptop on the same WiFi. The backend listens on `0.0.0.0` and allows local-network origins in development.
 
 ### Step 3 — Axios client (`frontend/src/services/api.js`)
 
@@ -397,8 +429,16 @@ api.interceptors.request.use((config) => {
 ```javascript
 export const authApi = { login, register, me, updateProfile, getStudents };
 export const assignmentApi = { list, get, create, update, remove };
-export const submissionApi = { list, submit, submitFiles, history, updateStatus };
+export const submissionApi = { list, submit, submitFiles, history, updateStatus, updateFeedback };
 export const dashboardApi = { teacher, student };
+```
+
+File helpers also exported from `api.js`:
+
+```javascript
+resolveFileUrl(url)    // prepends API base for relative file paths
+fetchFileBlob(url)     // authenticated blob fetch for preview/download
+downloadFile(url, name) // triggers named browser download
 ```
 
 ### Step 5 — Page calls API
@@ -607,6 +647,7 @@ pdf: (file)
 | POST | `/assignment/:assignmentId` | Yes | Student | Submit file or GitHub URL |
 | POST | `/assignment/:assignmentId/files` | Yes | Student | Submit multiple files (folder) |
 | PATCH | `/:id/status` | Yes | Teacher | Update status + remarks |
+| PATCH | `/:id/feedback` | Yes | Teacher | Add or update teacher feedback |
 | GET | `/export/all` | Yes | Teacher | Export all submissions |
 
 **POST /assignment/:id — multipart/form-data:**
@@ -620,7 +661,19 @@ github_url: "https://github.com/user/repo"  (optional)
 { "status": "reviewed", "remarks": "Good work!" }
 ```
 
+**PATCH /:id/feedback — Request:**
+```json
+{ "feedback": "Nice structure. Add error handling for edge cases." }
+```
+
+Feedback is stored in the `remarks` column and shown to the student on assignment detail and submission history pages.
+
 Status values: `pending`, `submitted`, `reviewed`, `late`
+
+**GET / — Query params (teacher):**
+```
+?search=john&status=submitted&assignment_id=3
+```
 
 ---
 
@@ -648,8 +701,10 @@ Status values: `pending`, `submitted`, `reviewed`, `late`
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| GET | `/assignments/:filename` | Yes | Download assignment PDF |
-| GET | `/submissions/:filename` | Yes | Download student submission |
+| GET | `/assignments/:filename` | Yes | Download or preview assignment PDF |
+| GET | `/submissions/:filename` | Yes | Download or preview student submission |
+
+Both endpoints stream files with correct `Content-Type` headers. The frontend uses `fetchFileBlob()` for inline preview (PDF, images, text) and `downloadFile()` with custom filenames.
 
 ---
 
@@ -658,13 +713,14 @@ Status values: `pending`, `submitted`, `reviewed`, `late`
 ### Flow A — Teacher uploads an assignment
 
 ```
-1. Teacher fills form on /teacher/upload
-2. Frontend builds FormData with title, description, deadline, pdf file
-3. assignmentApi.create(formData)
+1. Teacher fills form on /teacher/upload (date-only deadline picker)
+2. Frontend converts date to end-of-day ISO via `dateInputToDeadlineISO()`
+3. Frontend builds FormData with title, description, deadline, pdf file
+4. assignmentApi.create(formData)
    → POST /api/assignments  (multipart)
-4. Backend: multer saves PDF to uploads/assignments/
-5. Backend: INSERT row in assignments table
-6. Frontend: toast "Assignment published!" → navigate to /teacher/assignments
+5. Backend: multer saves PDF via storage service
+6. Backend: INSERT row in assignments table
+7. Frontend: toast "Assignment published!" → navigate to /teacher/assignments
 ```
 
 ### Flow B — Student submits work
@@ -685,13 +741,15 @@ Status values: `pending`, `submitted`, `reviewed`, `late`
 ### Flow C — Teacher reviews submission
 
 ```
-1. Teacher opens /teacher/submissions
-2. submissionApi.list({ search, status })
-   → GET /api/submissions?search=john&status=submitted
-3. Teacher clicks status dropdown → 'reviewed'
-4. submissionApi.updateStatus(id, { status: 'reviewed', remarks: '...' })
-   → PATCH /api/submissions/5/status
-5. Student sees 'Reviewed' badge on their assignment detail page
+1. Teacher opens /teacher/submissions (optional ?assignment_id= filter)
+2. submissionApi.list({ search, status, assignment_id })
+   → GET /api/submissions?search=john&status=submitted&assignment_id=3
+3. Teacher previews file (eye icon) → FilePreviewModal opens inline
+4. Teacher downloads with name like john_week-1-assignment.zip
+5. Teacher clicks status dropdown → 'reviewed' (colored StatusSelect)
+6. Teacher opens feedback modal → submissionApi.updateFeedback(id, { feedback })
+   → PATCH /api/submissions/5/feedback
+7. Student sees 'Reviewed' badge and feedback on assignment detail / history
 ```
 
 ### Flow D — Login and session restore
@@ -731,18 +789,28 @@ storageService.saveFile(type, file)
 URL stored in database (pdf_url or uploaded_file column)
 ```
 
-### Downloading files
+### Downloading and previewing files
 
-Frontend uses `downloadFile()` in `api.js`:
+Frontend uses helpers in `api.js`:
 
 ```javascript
-fetch('/api/files/assignments/filename.pdf', {
-  headers: { Authorization: `Bearer ${token}` }
-})
-→ returns blob → triggers browser download
+// Named download (e.g. studentname_assignment-title.zip)
+downloadFile(url, buildSubmissionDownloadName(username, title, url))
+
+// Inline preview in FilePreviewModal
+fetchFileBlob(url) → blob URL → iframe/img/pre tag
 ```
 
-Files require authentication — students cannot download other students' submissions.
+Assignment PDFs download with the assignment title as filename. Files require authentication — students cannot access other students' submissions.
+
+### Storage backends
+
+| Environment | Backend | Path |
+|-------------|---------|------|
+| Local dev | `storage/local.js` | `uploads/assignments/`, `uploads/submissions/` |
+| Production | `storage/supabase.js` | Supabase Storage buckets |
+
+Set `STORAGE_TYPE=supabase` with `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` for production. See [FREE_DEPLOYMENT_GUIDE.md](FREE_DEPLOYMENT_GUIDE.md).
 
 ### Folder upload (student)
 
@@ -790,7 +858,7 @@ Every assignment API response for students includes `student_status` and `my_sub
 
 | Variable | Example | Purpose |
 |----------|---------|---------|
-| `VITE_API_URL` | `http://localhost:8000/api` | Backend API base URL |
+| `VITE_API_URL` | `/api` | Backend API base URL (use `/api` locally with Vite proxy) |
 
 > **Note:** Only variables prefixed with `VITE_` are exposed to the React app.
 
@@ -813,6 +881,8 @@ npm install
 npm run dev            # starts on http://localhost:5173
 ```
 
+**Same WiFi:** Use the **Network** URL from the Vite terminal output to test on other devices.
+
 ### Default login
 - **Teacher:** `teacher` / `teacher123`
 - **Student:** register at `/register`
@@ -834,17 +904,19 @@ npm run dev            # starts on http://localhost:5173
 | Frontend | Vercel | Yes |
 | Backend | Render | Yes (cold starts) |
 | Database | Neon PostgreSQL | Yes |
+| File storage | Supabase Storage | Yes (1 GB) |
 
 ### Production changes required
 
 1. Set `USE_SQLITE=false` on backend
 2. Set `DATABASE_URL` to Neon connection string
 3. Run `database/schema.sql` on Neon
-4. Set `VITE_API_URL=https://your-api.onrender.com/api` on Vercel
-5. Set `FRONTEND_URL=https://your-app.vercel.app` on Render
-6. Change `JWT_SECRET` and `TEACHER_PASSWORD`
+4. Set `STORAGE_TYPE=supabase` with Supabase credentials
+5. Set `VITE_API_URL=https://your-api.onrender.com/api` on Vercel
+6. Set `FRONTEND_URL=https://your-app.vercel.app` on Render
+7. Change `JWT_SECRET` and `TEACHER_PASSWORD`
 
-> **File uploads on Render free tier:** Local disk storage is not persistent across restarts. For production, integrate Supabase Storage or Cloudinary.
+> Full step-by-step instructions: [FREE_DEPLOYMENT_GUIDE.md](FREE_DEPLOYMENT_GUIDE.md)
 
 ---
 
@@ -862,6 +934,43 @@ Use this checklist to verify you understand the project:
 - [ ] I know the difference between `submitted`, `reviewed`, and `late` status
 - [ ] I understand how Vite proxy connects frontend to backend in dev
 - [ ] I can list all API endpoints and which role can access each
+- [ ] I understand how teacher feedback flows from PATCH /feedback to student UI
+- [ ] I know how FilePreviewModal decides preview vs download-only
+- [ ] I can explain date-only deadlines and `dateInputToDeadlineISO()`
+
+---
+
+## 18. UI Components & UX Features
+
+### Teacher experience
+
+| Page | Notable UX |
+|------|------------|
+| `UploadAssignment.jsx` | Sectioned layout, date picker, PDF preview sidebar |
+| `ManageAssignments.jsx` | Card grid with submission counts and stats |
+| `SubmissionList.jsx` | Compact table, assignment filter, search, status filter, preview + feedback |
+| `TeacherProfile.jsx` | Profile / Security tabs, username and password change |
+
+### Student experience
+
+| Page | Notable UX |
+|------|------------|
+| `StudentDashboard.jsx` | Stats cards and recent assignments |
+| `StudentAssignments.jsx` | Card-based assignment list with status filters |
+| `AssignmentDetail.jsx` | Sidebar layout, PDF preview button, feedback display |
+| `SubmissionHistory.jsx` | History list with teacher feedback |
+| `SubmitAssignment.jsx` | File picker, GitHub URL, folder upload |
+
+### Status colors
+
+The `StatusSelect` component applies distinct colors per status via `statusSelectClass()` in `helpers.js`, making submission state scannable at a glance.
+
+### Named downloads
+
+Downloads use human-readable names instead of server-generated UUID filenames:
+
+- Submissions: `{username}_{assignment-title}.{ext}`
+- Assignment PDFs: assignment title
 
 ---
 
@@ -874,11 +983,15 @@ Use this checklist to verify you understand the project:
 | Teacher dashboard | `pages/teacher/TeacherDashboard.jsx` | `routers/dashboard.js` |
 | Upload assignment | `pages/teacher/UploadAssignment.jsx` | `routers/assignments.js` |
 | Submit work | `pages/student/SubmitAssignment.jsx` | `routers/submissions.js` |
+| Teacher feedback | `pages/teacher/SubmissionList.jsx` | `routers/submissions.js` (PATCH /feedback) |
+| File preview | `components/UI.jsx` (FilePreviewModal) | `routers/files.js` + storage services |
 | Change password | `pages/teacher/TeacherProfile.jsx` | `routers/auth.js` (PATCH /profile) |
-| Download PDF | `pages/student/AssignmentDetail.jsx` | `routers/files.js` |
+| Download/preview PDF | `pages/student/AssignmentDetail.jsx` | `routers/files.js` |
+| Shared UI | `components/UI.jsx` | — |
+| Helpers (dates, names) | `utils/helpers.js` | — |
 | Auth state | `context/AuthContext.jsx` | `middleware/auth.js` |
 | All API calls | `services/api.js` | all routers |
 
 ---
 
-*Documentation version: 1.0 — Terralogic Assignment Portal*
+*Documentation version: 1.1 — Terralogic Assignment Portal*

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ArrowRight, BookOpen, Calendar } from 'lucide-react';
 import PageHeader from '../../components/PageHeader';
 import { assignmentApi } from '../../services/api';
-import { formatDate } from '../../utils/helpers';
-import { DataTable, EmptyState, FilterTabs, LoadingPage, StatusBadge } from '../../components/UI';
+import { formatDateOnly } from '../../utils/helpers';
+import { EmptyState, FilterTabs, IconBox, LoadingPage, StatusBadge } from '../../components/UI';
 
 export default function StudentAssignments() {
   const [assignments, setAssignments] = useState([]);
@@ -30,7 +31,7 @@ export default function StudentAssignments() {
       <PageHeader
         badge="Assignments"
         title="Your Assignments"
-        subtitle="Download PDFs and submit your work before the deadline."
+        subtitle="Open an assignment to download the PDF and submit your work before the due date."
       />
 
       <FilterTabs tabs={tabs} active={filter} onChange={setFilter} />
@@ -40,28 +41,37 @@ export default function StudentAssignments() {
       ) : assignments.length === 0 ? (
         <EmptyState title="No assignments found" description="Try another filter or check back later." />
       ) : (
-        <DataTable columns={['Title', 'Deadline', 'Status', 'Action']}>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {assignments.map((a) => (
-            <tr key={a.id} className="transition hover:bg-slate-50/80">
-              <td className="px-6 py-4">
-                <p className="font-medium text-slate-900">{a.title}</p>
-                <p className="mt-1 line-clamp-1 text-slate-500">{a.description}</p>
-              </td>
-              <td className="px-6 py-4 text-slate-600">{formatDate(a.deadline)}</td>
-              <td className="px-6 py-4">
-                <StatusBadge status={a.student_status || 'pending'} />
-              </td>
-              <td className="px-6 py-4">
-                <Link
-                  to={`/student/assignments/${a.id}`}
-                  className="font-semibold text-brand-600 hover:text-brand-700 hover:underline"
-                >
-                  View details
-                </Link>
-              </td>
-            </tr>
+            <Link
+              key={a.id}
+              to={`/student/assignments/${a.id}`}
+              className="group flex flex-col rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-md"
+            >
+              <div className="flex items-start gap-3">
+                <IconBox icon={BookOpen} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="font-semibold text-slate-900 group-hover:text-brand-700">{a.title}</h3>
+                    <StatusBadge status={a.student_status || 'pending'} />
+                  </div>
+                  <p className="mt-2 line-clamp-2 text-sm text-slate-500">{a.description || 'No description'}</p>
+                </div>
+              </div>
+
+              <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
+                <div className="flex items-center gap-1.5 text-sm text-slate-600">
+                  <Calendar size={14} className="text-brand-600" />
+                  {formatDateOnly(a.deadline)}
+                </div>
+                <span className="inline-flex items-center gap-1 text-sm font-semibold text-brand-600 group-hover:gap-2 transition-all">
+                  Open
+                  <ArrowRight size={14} />
+                </span>
+              </div>
+            </Link>
           ))}
-        </DataTable>
+        </div>
       )}
     </div>
   );

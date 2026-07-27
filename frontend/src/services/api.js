@@ -72,16 +72,30 @@ export const dashboardApi = {
   student: () => api.get('/dashboard/student'),
 };
 
-export function downloadFile(url, filename) {
+export function resolveFileUrl(url) {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (url.startsWith('/api')) return url;
+  const base = API_URL.replace(/\/api\/?$/, '');
+  return `${base}${url.startsWith('/') ? url : `/${url}`}`;
+}
+
+export async function fetchFileBlob(url) {
   const token = localStorage.getItem('token');
-  return fetch(url.startsWith('http') ? url : `${API_URL.replace('/api', '')}${url}`, {
+  const res = await fetch(resolveFileUrl(url), {
     headers: { Authorization: `Bearer ${token}` },
-  })
-    .then((res) => {
-      if (!res.ok) throw new Error('Download failed');
-      return res.blob();
-    })
-    .then((blob) => {
+  });
+  if (!res.ok) throw new Error('Could not load file');
+  const blob = await res.blob();
+  return {
+    blob,
+    contentType: res.headers.get('Content-Type') || blob.type || 'application/octet-stream',
+  };
+}
+
+export function downloadFile(url, filename) {
+  return fetchFileBlob(url)
+    .then(({ blob }) => {
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
       link.download = filename;
