@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Download, ExternalLink, MessageSquare, X } from 'lucide-react';
 import PageHeader from '../../components/PageHeader';
-import { submissionApi, downloadFile } from '../../services/api';
+import { assignmentApi, submissionApi, downloadFile } from '../../services/api';
 import { formatDate } from '../../utils/helpers';
 import { DataTable, EmptyState, LoadingPage, NoticeCard, StatusBadge } from '../../components/UI';
 
@@ -93,8 +93,9 @@ function FeedbackModal({ submission, onClose, onSaved }) {
 }
 
 export default function SubmissionList() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [items, setItems] = useState([]);
+  const [assignments, setAssignments] = useState([]);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(true);
@@ -102,6 +103,31 @@ export default function SubmissionList() {
   const [notice, setNotice] = useState(null);
 
   const assignmentId = searchParams.get('assignment_id') || '';
+  const selectedAssignment = assignments.find((a) => String(a.id) === assignmentId);
+
+  useEffect(() => {
+    assignmentApi.list({ limit: 100 })
+      .then(({ data }) => setAssignments(data.items))
+      .catch(() => {});
+  }, []);
+
+  const handleAssignmentFilter = (value) => {
+    const next = new URLSearchParams(searchParams);
+    if (value) {
+      next.set('assignment_id', value);
+    } else {
+      next.delete('assignment_id');
+    }
+    setSearchParams(next);
+  };
+
+  const clearFilters = () => {
+    setSearch('');
+    setStatus('');
+    setSearchParams({});
+  };
+
+  const hasActiveFilters = Boolean(search || status || assignmentId);
 
   const load = () => {
     setLoading(true);
@@ -177,7 +203,11 @@ export default function SubmissionList() {
       <PageHeader
         badge="Review"
         title="Submissions"
-        subtitle="Search, review, and download student submissions."
+        subtitle={
+          selectedAssignment
+            ? `Showing submissions for "${selectedAssignment.title}" only.`
+            : 'Search, review, and download student submissions.'
+        }
       />
 
       {notice && (
@@ -190,9 +220,21 @@ export default function SubmissionList() {
       )}
 
       <div className="flex flex-wrap gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
+        <select
+          value={assignmentId}
+          onChange={(e) => handleAssignmentFilter(e.target.value)}
+          className={`min-w-[220px] ${inputClass}`}
+        >
+          <option value="">All assignments</option>
+          {assignments.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.title} ({a.submission_count || 0})
+            </option>
+          ))}
+        </select>
         <input
           type="search"
-          placeholder="Search by username or assignment..."
+          placeholder="Search by student or assignment..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className={`min-w-[240px] flex-1 ${inputClass}`}
@@ -204,12 +246,28 @@ export default function SubmissionList() {
           <option value="late">Late</option>
           <option value="pending">Pending</option>
         </select>
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+          >
+            Clear filters
+          </button>
+        )}
       </div>
 
       {loading ? (
         <LoadingPage />
       ) : items.length === 0 ? (
-        <EmptyState title="No submissions found" description="Try adjusting your search filters." />
+        <EmptyState
+          title="No submissions found"
+          description={
+            hasActiveFilters
+              ? 'No submissions match the current filters. Try clearing filters or choosing another assignment.'
+              : 'Submissions will appear here once students submit their work.'
+          }
+        />
       ) : (
         <DataTable columns={['Student', 'Assignment', 'Submitted', 'Status', 'Feedback', 'Actions']}>
           {items.map((s) => (
