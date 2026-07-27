@@ -1,0 +1,145 @@
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import { ArrowLeft } from 'lucide-react';
+import PageHeader from '../../components/PageHeader';
+import { assignmentApi, submissionApi } from '../../services/api';
+import { formatDate, isPastDeadline } from '../../utils/helpers';
+import { FilterTabs, LoadingPage, Panel } from '../../components/UI';
+
+export default function SubmitAssignment() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [assignment, setAssignment] = useState(null);
+  const [githubUrl, setGithubUrl] = useState('');
+  const [file, setFile] = useState(null);
+  const [folderFiles, setFolderFiles] = useState([]);
+  const [mode, setMode] = useState('file');
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    assignmentApi.get(id)
+      .then(({ data }) => {
+        setAssignment(data);
+        setGithubUrl(data.my_submission?.github_url || '');
+      })
+      .catch((err) => toast.error(err.message))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (isPastDeadline(assignment.deadline)) {
+      toast.error('Deadline has passed');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const formData = new FormData();
+      if (githubUrl) formData.append('github_url', githubUrl);
+
+      if (mode === 'file' && file) {
+        formData.append('file', file);
+        await submissionApi.submit(id, formData);
+      } else if (mode === 'folder' && folderFiles.length) {
+        folderFiles.forEach((f) => formData.append('files', f));
+        await submissionApi.submitFiles(id, formData);
+      } else if (githubUrl) {
+        await submissionApi.submit(id, formData);
+      } else {
+        throw new Error('Upload a file or provide a GitHub URL');
+      }
+
+      toast.success('Submission saved successfully!');
+      navigate(`/student/assignments/${id}`);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) return <LoadingPage />;
+  if (!assignment) return null;
+
+  return (
+    <div className="mx-auto max-w-2xl space-y-6">
+      <Link
+        to={`/student/assignments/${id}`}
+        className="inline-flex items-center gap-2 text-sm font-medium text-brand-600 hover:text-brand-700"
+      >
+        <ArrowLeft size={16} />
+        Back to assignment
+      </Link>
+
+      <PageHeader
+        badge="Submit Work"
+        title={assignment.title}
+        subtitle={`Deadline: ${formatDate(assignment.deadline)}`}
+      />
+
+      <Panel>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700">GitHub Repository URL</label>
+            <input
+              type="url"
+              value={githubUrl}
+              onChange={(e) => setGithubUrl(e.target.value)}
+              placeholder="https://github.com/username/repo"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 outline-none transition focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10"
+            />
+          </div>
+
+          <div>
+            <p className="mb-3 text-sm font-medium text-slate-700">Upload Method</p>
+            <FilterTabs
+              tabs={[
+                { key: 'file', label: 'ZIP / File' },
+                { key: 'folder', label: 'Folder' },
+              ]}
+              active={mode}
+              onChange={setMode}
+            />
+          </div>
+
+          {mode === 'file' ? (
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">Upload ZIP or file (max 200 MB)</label>
+              <input
+                type="file"
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                className="block w-full rounded-xl border border-dashed border-slate-300 bg-slate-50/50 p-4 text-sm file:mr-4 file:rounded-lg file:border-0 file:bg-brand-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
+              />
+            </div>
+          ) : (
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">Upload folder</label>
+              <input
+                type="file"
+                webkitdirectory=""
+                directory=""
+                multiple
+                onChange={(e) => setFolderFiles(Array.from(e.target.files || []))}
+                className="block w-full rounded-xl border border-dashed border-slate-300 bg-slate-50/50 p-4 text-sm"
+              />
+              {folderFiles.length > 0 && (
+                <p className="mt-2 text-sm text-slate-500">{folderFiles.length} files selected</p>
+              )}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full rounded-xl bg-brand-600 py-3.5 text-sm font-semibold text-white shadow-md shadow-brand-600/20 transition hover:bg-brand-700 disabled:opacity-60"
+          >
+            {submitting ? 'Submitting...' : 'Submit Assignment'}
+          </button>
+        </form>
+      </Panel>
+    </div>
+  );
+}
