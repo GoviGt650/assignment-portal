@@ -52,9 +52,10 @@ export default function SubmissionHistory() {
                 </Link>
               </div>
               {s.remarks && (
-                <p className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                  Teacher remarks: {s.remarks}
-                </p>
+                <div className="mt-4 rounded-xl border border-brand-100 bg-brand-50/50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-brand-700">Teacher feedback</p>
+                  <p className="mt-1 text-sm text-slate-700">{s.remarks}</p>
+                </div>
               )}
             </Panel>
           ))}

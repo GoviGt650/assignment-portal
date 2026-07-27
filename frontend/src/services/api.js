@@ -63,6 +63,7 @@ export const submissionApi = {
     { headers: { 'Content-Type': 'multipart/form-data' } }
   ),
   updateStatus: (id, data) => api.patch(`/submissions/${id}/status`, data),
+  updateFeedback: (id, feedback) => api.patch(`/submissions/${id}/feedback`, { feedback }),
   exportAll: (params) => api.get('/submissions/export/all', { params }),
 };
 

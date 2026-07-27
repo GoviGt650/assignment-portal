@@ -17,11 +17,24 @@ export function authenticate(req, res, next) {
 }
 
 export function requireRole(...roles) {
-  return (req, res, next) => {
-    if (!req.user || !roles.includes(req.user.role)) {
-      return next(new ForbiddenError('Insufficient permissions'));
+  return async (req, res, next) => {
+    try {
+      if (!req.user?.sub) {
+        return next(new ForbiddenError('Insufficient permissions'));
+      }
+      const result = await query(
+        'SELECT role FROM users WHERE id = $1',
+        [req.user.sub]
+      );
+      const role = result.rows[0]?.role || req.user.role;
+      if (!role || !roles.includes(role)) {
+        return next(new ForbiddenError('Insufficient permissions'));
+      }
+      req.user.role = role;
+      next();
+    } catch (err) {
+      next(err);
     }
-    next();
   };
 }
 

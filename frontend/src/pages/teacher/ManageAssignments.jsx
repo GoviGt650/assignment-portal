@@ -1,33 +1,53 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import toast from 'react-hot-toast';
 import { Trash2, Upload } from 'lucide-react';
 import PageHeader from '../../components/PageHeader';
 import { assignmentApi } from '../../services/api';
 import { formatDate } from '../../utils/helpers';
-import { DataTable, EmptyState, LoadingPage } from '../../components/UI';
+import { ConfirmDialog, DataTable, EmptyState, LoadingPage, NoticeCard } from '../../components/UI';
 
 export default function ManageAssignments() {
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [notice, setNotice] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = () => {
     setLoading(true);
     assignmentApi.list({ limit: 100 })
       .then(({ data }) => setAssignments(data.items))
+      .catch((err) => setNotice({
+        type: 'error',
+        title: 'Could not load assignments',
+        message: err.message,
+      }))
       .finally(() => setLoading(false));
   };
 
   useEffect(load, []);
 
-  const handleDelete = async (id, title) => {
-    if (!window.confirm(`Delete "${title}"?`)) return;
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setNotice(null);
     try {
-      await assignmentApi.remove(id);
-      toast.success('Assignment deleted');
+      await assignmentApi.remove(deleteTarget.id);
+      setNotice({
+        type: 'success',
+        title: 'Assignment deleted',
+        message: `"${deleteTarget.title}" was removed successfully.`,
+      });
+      setDeleteTarget(null);
       load();
     } catch (err) {
-      toast.error(err.message);
+      setNotice({
+        type: 'error',
+        title: 'Delete failed',
+        message: err.message,
+      });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -47,6 +67,15 @@ export default function ManageAssignments() {
           </Link>
         }
       />
+
+      {notice && (
+        <NoticeCard
+          type={notice.type}
+          title={notice.title}
+          message={notice.message}
+          onDismiss={() => setNotice(null)}
+        />
+      )}
 
       {loading ? (
         <LoadingPage />
@@ -69,7 +98,7 @@ export default function ManageAssignments() {
                   </Link>
                   <button
                     type="button"
-                    onClick={() => handleDelete(a.id, a.title)}
+                    onClick={() => setDeleteTarget(a)}
                     className="inline-flex items-center gap-1 font-semibold text-red-600 hover:underline"
                   >
                     <Trash2 size={14} />
@@ -80,6 +109,16 @@ export default function ManageAssignments() {
             </tr>
           ))}
         </DataTable>
+      )}
+
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Delete assignment?"
+          message={`"${deleteTarget.title}" and all related submissions will be permanently removed.`}
+          confirmLabel={deleting ? 'Deleting...' : 'Delete'}
+          onConfirm={handleDelete}
+          onCancel={() => !deleting && setDeleteTarget(null)}
+        />
       )}
     </div>
   );

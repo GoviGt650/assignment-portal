@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
 import PageHeader from '../../components/PageHeader';
 import { assignmentApi } from '../../services/api';
-import { Panel } from '../../components/UI';
+import { FilePicker, NoticeCard, Panel } from '../../components/UI';
 
 const inputClass =
   'w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 outline-none transition focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10';
@@ -15,22 +14,42 @@ export default function UploadAssignment() {
   const [deadline, setDeadline] = useState('');
   const [pdf, setPdf] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [notice, setNotice] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setNotice(null);
+
+    if (!pdf) {
+      setNotice({
+        type: 'error',
+        title: 'PDF required',
+        message: 'Please select an assignment PDF before publishing.',
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const formData = new FormData();
       formData.append('title', title);
       formData.append('description', description);
       formData.append('deadline', new Date(deadline).toISOString());
-      if (pdf) formData.append('pdf', pdf);
+      formData.append('pdf', pdf);
 
       await assignmentApi.create(formData);
-      toast.success('Assignment published!');
-      navigate('/teacher/assignments');
+      setNotice({
+        type: 'success',
+        title: 'Assignment published',
+        message: `"${title}" is now live for students. Redirecting to assignments...`,
+      });
+      setTimeout(() => navigate('/teacher/assignments'), 1800);
     } catch (err) {
-      toast.error(err.message);
+      setNotice({
+        type: 'error',
+        title: 'Upload failed',
+        message: err.message || 'Could not publish the assignment. Please try again.',
+      });
     } finally {
       setLoading(false);
     }
@@ -43,6 +62,15 @@ export default function UploadAssignment() {
         title="Upload Assignment"
         subtitle="Publish a new assignment with PDF and deadline for your students."
       />
+
+      {notice && (
+        <NoticeCard
+          type={notice.type}
+          title={notice.title}
+          message={notice.message}
+          onDismiss={() => setNotice(null)}
+        />
+      )}
 
       <Panel>
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -69,15 +97,13 @@ export default function UploadAssignment() {
               required
             />
           </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">Assignment PDF</label>
-            <input
-              type="file"
-              accept="application/pdf,.pdf"
-              onChange={(e) => setPdf(e.target.files?.[0] || null)}
-              className="block w-full rounded-xl border border-dashed border-slate-300 bg-slate-50/50 p-4 text-sm file:mr-4 file:rounded-lg file:border-0 file:bg-brand-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
-            />
-          </div>
+          <FilePicker
+            label="Assignment PDF"
+            hint="PDF only · Max 10 MB"
+            accept="application/pdf,.pdf"
+            fileName={pdf?.name}
+            onChange={(e) => setPdf(e.target.files?.[0] || null)}
+          />
           <button
             type="submit"
             disabled={loading}

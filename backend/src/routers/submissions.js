@@ -253,6 +253,35 @@ router.patch(
   }
 );
 
+router.patch(
+  '/:id/feedback',
+  authenticate,
+  requireRole('teacher'),
+  [body('feedback').optional().trim()],
+  async (req, res, next) => {
+    try {
+      validate(req);
+      const feedback = req.body.feedback?.trim() || null;
+      const result = await query(
+        `UPDATE submissions
+         SET remarks = $1,
+             status = CASE
+               WHEN $2 IS NOT NULL AND status IN ('submitted', 'late') THEN 'reviewed'
+               ELSE status
+             END
+         WHERE id = $3 RETURNING *`,
+        [feedback, feedback, req.params.id]
+      );
+      if (result.rows.length === 0) {
+        throw new NotFoundError('Submission not found');
+      }
+      res.json(result.rows[0]);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 router.get('/export/all', authenticate, requireRole('teacher'), async (req, res, next) => {
   try {
     const { assignment_id } = req.query;

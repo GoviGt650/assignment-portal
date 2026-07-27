@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import toast from 'react-hot-toast';
 import { ArrowLeft } from 'lucide-react';
 import PageHeader from '../../components/PageHeader';
 import { assignmentApi, submissionApi } from '../../services/api';
 import { formatDate, isPastDeadline } from '../../utils/helpers';
-import { FilterTabs, LoadingPage, Panel } from '../../components/UI';
+import { FilePicker, FilterTabs, LoadingPage, NoticeCard, Panel } from '../../components/UI';
 
 export default function SubmitAssignment() {
   const { id } = useParams();
@@ -17,6 +16,8 @@ export default function SubmitAssignment() {
   const [mode, setMode] = useState('file');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [notice, setNotice] = useState(null);
+  const [loadError, setLoadError] = useState(null);
 
   useEffect(() => {
     assignmentApi.get(id)
@@ -24,14 +25,20 @@ export default function SubmitAssignment() {
         setAssignment(data);
         setGithubUrl(data.my_submission?.github_url || '');
       })
-      .catch((err) => toast.error(err.message))
+      .catch((err) => setLoadError(err.message))
       .finally(() => setLoading(false));
   }, [id]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setNotice(null);
+
     if (isPastDeadline(assignment.deadline)) {
-      toast.error('Deadline has passed');
+      setNotice({
+        type: 'error',
+        title: 'Deadline passed',
+        message: 'This assignment is no longer accepting submissions.',
+      });
       return;
     }
 
@@ -52,16 +59,33 @@ export default function SubmitAssignment() {
         throw new Error('Upload a file or provide a GitHub URL');
       }
 
-      toast.success('Submission saved successfully!');
-      navigate(`/student/assignments/${id}`);
+      setNotice({
+        type: 'success',
+        title: 'Submission received',
+        message: 'Your work was saved successfully. Redirecting to the assignment page...',
+      });
+      setTimeout(() => navigate(`/student/assignments/${id}`), 1800);
     } catch (err) {
-      toast.error(err.message);
+      setNotice({
+        type: 'error',
+        title: 'Submission failed',
+        message: err.message || 'Could not save your submission. Please try again.',
+      });
     } finally {
       setSubmitting(false);
     }
   };
 
   if (loading) return <LoadingPage />;
+
+  if (loadError) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-6">
+        <NoticeCard type="error" title="Could not load assignment" message={loadError} />
+      </div>
+    );
+  }
+
   if (!assignment) return null;
 
   return (
@@ -79,6 +103,15 @@ export default function SubmitAssignment() {
         title={assignment.title}
         subtitle={`Deadline: ${formatDate(assignment.deadline)}`}
       />
+
+      {notice && (
+        <NoticeCard
+          type={notice.type}
+          title={notice.title}
+          message={notice.message}
+          onDismiss={() => setNotice(null)}
+        />
+      )}
 
       <Panel>
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -106,28 +139,21 @@ export default function SubmitAssignment() {
           </div>
 
           {mode === 'file' ? (
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">Upload ZIP or file (max 200 MB)</label>
-              <input
-                type="file"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
-                className="block w-full rounded-xl border border-dashed border-slate-300 bg-slate-50/50 p-4 text-sm file:mr-4 file:rounded-lg file:border-0 file:bg-brand-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
-              />
-            </div>
+            <FilePicker
+              label="Upload ZIP or file"
+              hint="Max 200 MB"
+              fileName={file?.name}
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
+            />
           ) : (
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">Upload folder</label>
-              <input
-                type="file"
-                webkitdirectory=""
-                directory=""
-                multiple
+            <div className="space-y-2">
+              <FilePicker
+                label="Upload folder"
+                hint="All files will be zipped automatically"
+                directory
+                fileName={folderFiles.length ? `${folderFiles.length} files selected` : null}
                 onChange={(e) => setFolderFiles(Array.from(e.target.files || []))}
-                className="block w-full rounded-xl border border-dashed border-slate-300 bg-slate-50/50 p-4 text-sm"
               />
-              {folderFiles.length > 0 && (
-                <p className="mt-2 text-sm text-slate-500">{folderFiles.length} files selected</p>
-              )}
             </div>
           )}
 

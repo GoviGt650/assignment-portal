@@ -1,4 +1,123 @@
 import { STATUS_LABELS, statusColor } from '../utils/helpers';
+import { AlertCircle, CheckCircle2, Info, X, XCircle } from 'lucide-react';
+
+const noticeStyles = {
+  success: {
+    wrap: 'border-emerald-200 bg-gradient-to-br from-emerald-50 to-white',
+    icon: 'text-emerald-600',
+    title: 'text-emerald-900',
+    message: 'text-emerald-800',
+    Icon: CheckCircle2,
+  },
+  error: {
+    wrap: 'border-red-200 bg-gradient-to-br from-red-50 to-white',
+    icon: 'text-red-600',
+    title: 'text-red-900',
+    message: 'text-red-800',
+    Icon: XCircle,
+  },
+  info: {
+    wrap: 'border-brand-200 bg-gradient-to-br from-brand-50 to-white',
+    icon: 'text-brand-600',
+    title: 'text-brand-900',
+    message: 'text-brand-800',
+    Icon: Info,
+  },
+  warning: {
+    wrap: 'border-amber-200 bg-gradient-to-br from-amber-50 to-white',
+    icon: 'text-amber-600',
+    title: 'text-amber-900',
+    message: 'text-amber-800',
+    Icon: AlertCircle,
+  },
+};
+
+export function NoticeCard({ type = 'info', title, message, onDismiss, action }) {
+  const style = noticeStyles[type] || noticeStyles.info;
+  const Icon = style.Icon;
+
+  return (
+    <div className={`rounded-2xl border p-5 shadow-sm ${style.wrap}`}>
+      <div className="flex gap-4">
+        <div className={`mt-0.5 shrink-0 ${style.icon}`}>
+          <Icon size={22} />
+        </div>
+        <div className="min-w-0 flex-1">
+          {title && <h3 className={`font-semibold ${style.title}`}>{title}</h3>}
+          {message && <p className={`mt-1 text-sm leading-relaxed ${style.message}`}>{message}</p>}
+          {action && <div className="mt-4">{action}</div>}
+        </div>
+        {onDismiss && (
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="shrink-0 rounded-lg p-1 text-slate-400 transition hover:bg-white/80 hover:text-slate-600"
+          >
+            <X size={16} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function ConfirmDialog({ title, message, confirmLabel = 'Confirm', cancelLabel = 'Cancel', onConfirm, onCancel, variant = 'danger' }) {
+  const confirmClass = variant === 'danger'
+    ? 'bg-red-600 hover:bg-red-700'
+    : 'bg-brand-600 hover:bg-brand-700';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-xl">
+        <div className="px-6 py-5">
+          <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+          <p className="mt-2 text-sm leading-relaxed text-slate-600">{message}</p>
+        </div>
+        <div className="flex justify-end gap-3 border-t border-slate-100 px-6 py-4">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+          >
+            {cancelLabel}
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className={`rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition ${confirmClass}`}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function FilePicker({ label, hint, accept, onChange, fileName, multiple, directory }) {
+  return (
+    <div>
+      {label && <label className="mb-2 block text-sm font-medium text-slate-700">{label}</label>}
+      <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 px-6 py-8 text-center transition hover:border-brand-300 hover:bg-brand-50/30">
+        <span className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm">
+          Choose file
+        </span>
+        <span className="mt-3 text-sm font-medium text-slate-700">
+          {fileName || 'Click to browse or drag a file here'}
+        </span>
+        {hint && <span className="mt-1 text-xs text-slate-500">{hint}</span>}
+        <input
+          type="file"
+          accept={accept}
+          multiple={multiple}
+          {...(directory ? { webkitdirectory: '', directory: '' } : {})}
+          onChange={onChange}
+          className="sr-only"
+        />
+      </label>
+    </div>
+  );
+}
 
 export function Spinner({ className = '' }) {
   return (

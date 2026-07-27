@@ -61,12 +61,17 @@ function persist() {
   fs.writeFileSync(dbPath, Buffer.from(db.export()));
 }
 
-function toSqliteSql(sql) {
-  return sql
-    .replace(/\$(\d+)/g, '?')
+function toSqliteSql(text, params = []) {
+  const expandedParams = [];
+  let sql = text.replace(/\$(\d+)/g, (_, num) => {
+    expandedParams.push(params[parseInt(num, 10) - 1]);
+    return '?';
+  });
+  sql = sql
     .replace(/ILIKE/gi, 'LIKE')
     .replace(/NOW\(\)/gi, "datetime('now')")
     .replace(/::\w+/g, '');
+  return { sql, params: expandedParams };
 }
 
 function runSelect(database, sql, params) {
@@ -83,13 +88,13 @@ function runSelect(database, sql, params) {
 export async function query(text, params = []) {
   const database = await getDb();
   const start = Date.now();
-  const sql = toSqliteSql(text);
+  const { sql, params: sqliteParams } = toSqliteSql(text, params);
 
   if (/^\s*INSERT/i.test(text) && /RETURNING/i.test(text)) {
     const tableMatch = text.match(/INTO\s+(\w+)/i);
     const table = tableMatch?.[1];
     const insertSql = sql.replace(/RETURNING.*/i, '').trim();
-    database.run(insertSql, params);
+    database.run(insertSql, sqliteParams);
     const idRow = runSelect(database, 'SELECT last_insert_rowid() AS id', [])[0];
     persist();
     const rows = runSelect(database, `SELECT * FROM ${table} WHERE id = ?`, [idRow.id]);
@@ -102,16 +107,16 @@ export async function query(text, params = []) {
   if (/^\s*UPDATE/i.test(text) && /RETURNING/i.test(text)) {
     const tableMatch = text.match(/UPDATE\s+(\w+)/i);
     const table = tableMatch?.[1];
-    const idParam = params[params.length - 1];
+    const idParam = sqliteParams[sqliteParams.length - 1];
     const updateSql = sql.replace(/RETURNING.*/i, '').trim();
-    database.run(updateSql, params);
+    database.run(updateSql, sqliteParams);
     persist();
     const rows = runSelect(database, `SELECT * FROM ${table} WHERE id = ?`, [idParam]);
     return { rows, rowCount: rows.length };
   }
 
   if (/^\s*SELECT/i.test(text)) {
-    const rows = runSelect(database, sql, params);
+    const rows = runSelect(database, sql, sqliteParams);
     if (rows.length) {
       const keys = Object.keys(rows[0]);
       const countKey = keys.find((k) => k.toLowerCase().includes('count'));
@@ -122,7 +127,7 @@ export async function query(text, params = []) {
     return { rows, rowCount: rows.length };
   }
 
-  database.run(sql, params);
+  database.run(sql, sqliteParams);
   persist();
   return { rows: [], rowCount: database.getRowsModified() };
 }
