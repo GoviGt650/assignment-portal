@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import PageHeader from '../../components/PageHeader';
 import { assignmentApi, submissionApi, downloadFile } from '../../services/api';
-import { buildSubmissionDownloadName, formatDate } from '../../utils/helpers';
+import { buildSubmissionDownloadName, formatDate, formatDateOnly } from '../../utils/helpers';
 import {
   DataTable,
   EmptyState,
@@ -18,6 +18,8 @@ import {
   FilterBar,
   LoadingPage,
   NoticeCard,
+  SelectDropdown,
+  StatusBadge,
   StatusSelect,
   UserAvatar,
 } from '../../components/UI';
@@ -103,20 +105,41 @@ export default function SubmissionList() {
   const [items, setItems] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(true);
   const [feedbackTarget, setFeedbackTarget] = useState(null);
   const [previewTarget, setPreviewTarget] = useState(null);
   const [notice, setNotice] = useState(null);
 
   const assignmentId = searchParams.get('assignment_id') || '';
+  const status = searchParams.get('status') || '';
+  const isAwaitingView = status === 'awaiting';
+  const isRosterView = Boolean(assignmentId) && !status && !isAwaitingView;
   const selectedAssignment = assignments.find((a) => String(a.id) === assignmentId);
 
-  const stats = useMemo(() => ({
-    total: items.length,
-    reviewed: items.filter((s) => s.status === 'reviewed').length,
-    withFeedback: items.filter((s) => s.remarks).length,
-  }), [items]);
+  const stats = useMemo(() => {
+    if (isAwaitingView) {
+      return {
+        total: items.length,
+        overdue: items.filter((s) => s.awaiting_status === 'overdue').length,
+        notSubmitted: items.filter((s) => s.awaiting_status === 'not_submitted').length,
+      };
+    }
+    if (isRosterView) {
+      return {
+        total: items.length,
+        submitted: items.filter((s) => s.id).length,
+        notSubmitted: items.filter((s) => !s.id).length,
+        reviewed: items.filter((s) => s.status === 'reviewed').length,
+      };
+    }
+    return {
+      total: items.length,
+      reviewed: items.filter((s) => s.status === 'reviewed').length,
+      withFeedback: items.filter((s) => s.remarks).length,
+    };
+  }, [items, isAwaitingView, isRosterView]);
+
+  const hasSubmission = (item) => Boolean(item?.id);
 
   useEffect(() => {
     assignmentApi.list({ limit: 100 })
@@ -131,9 +154,15 @@ export default function SubmissionList() {
     setSearchParams(next);
   };
 
+  const handleStatusFilter = (value) => {
+    const next = new URLSearchParams(searchParams);
+    if (value) next.set('status', value);
+    else next.delete('status');
+    setSearchParams(next);
+  };
+
   const clearFilters = () => {
     setSearch('');
-    setStatus('');
     setSearchParams({});
   };
 
@@ -141,16 +170,24 @@ export default function SubmissionList() {
 
   const load = () => {
     setLoading(true);
-    submissionApi.list({
+    const params = {
       search,
-      status: status || undefined,
       assignment_id: assignmentId || undefined,
       limit: 100,
-    })
+    };
+
+    const request = isAwaitingView
+      ? submissionApi.listAwaiting(params)
+      : submissionApi.list({
+        ...params,
+        status: status || undefined,
+      });
+
+    request
       .then(({ data }) => setItems(data.items))
       .catch((err) => setNotice({
         type: 'error',
-        title: 'Could not load submissions',
+        title: isAwaitingView ? 'Could not load awaiting students' : 'Could not load submissions',
         message: err.message,
       }))
       .finally(() => setLoading(false));
@@ -159,7 +196,7 @@ export default function SubmissionList() {
   useEffect(() => {
     const timer = setTimeout(load, 300);
     return () => clearTimeout(timer);
-  }, [search, status, assignmentId]);
+  }, [search, status, assignmentId, isAwaitingView]);
 
   const updateStatus = async (id, newStatus) => {
     setNotice(null);
@@ -193,9 +230,13 @@ export default function SubmissionList() {
         badge="Review"
         title="Submissions"
         subtitle={
-          selectedAssignment
-            ? `Reviewing "${selectedAssignment.title}".`
-            : 'Review, download, and leave feedback on student work.'
+          isAwaitingView
+            ? selectedAssignment
+              ? `Students who have not submitted "${selectedAssignment.title}".`
+              : 'Students who have not submitted yet. Pick an assignment to narrow the list.'
+            : selectedAssignment
+              ? `All students for "${selectedAssignment.title}" — submitted and not submitted.`
+              : 'Review, download, and leave feedback on student work.'
         }
       />
 
@@ -204,13 +245,20 @@ export default function SubmissionList() {
       )}
 
       <FilterBar>
-        <select value={assignmentId} onChange={(e) => handleAssignmentFilter(e.target.value)} className={`min-w-[220px] ${inputClass}`}>
-          <option value="">All assignments</option>
-          {assignments.map((a) => (
-            <option key={a.id} value={a.id}>{a.title} ({a.submission_count || 0})</option>
-          ))}
-        </select>
-        <div className="relative min-w-[240px] flex-1">
+        <SelectDropdown
+          value={assignmentId}
+          onChange={(e) => handleAssignmentFilter(e.target.value)}
+          className="w-full sm:min-w-[260px] sm:w-auto"
+          placeholder="Filter by assignment"
+          options={[
+            { value: '', label: 'All assignments' },
+            ...assignments.map((a) => ({
+              value: String(a.id),
+              label: `${a.title} · ${a.submission_count || 0}/${a.student_count || 0} submitted · ${a.awaiting_count || 0} awaiting`,
+            })),
+          ]}
+        />
+        <div className="relative w-full flex-1 sm:min-w-[240px]">
           <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-600" />
           <input
             type="search"
@@ -220,15 +268,21 @@ export default function SubmissionList() {
             className={`w-full pl-10 ${inputClass}`}
           />
         </div>
-        <select value={status} onChange={(e) => setStatus(e.target.value)} className={inputClass}>
-          <option value="">All statuses</option>
-          <option value="submitted">Submitted</option>
-          <option value="reviewed">Reviewed</option>
-          <option value="late">Late</option>
-          <option value="pending">Pending</option>
-        </select>
+        <SelectDropdown
+          value={status}
+          onChange={(e) => handleStatusFilter(e.target.value)}
+          className="w-full sm:w-auto sm:min-w-[200px]"
+          placeholder="All submissions"
+          options={[
+            { value: '', label: assignmentId ? 'All students' : 'All submissions' },
+            { value: 'awaiting', label: 'Awaiting submission' },
+            { value: 'submitted', label: 'Submitted' },
+            { value: 'reviewed', label: 'Reviewed' },
+            { value: 'late', label: 'Late' },
+          ]}
+        />
         {hasActiveFilters && (
-          <button type="button" onClick={clearFilters} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
+          <button type="button" onClick={clearFilters} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 sm:w-auto">
             Clear filters
           </button>
         )}
@@ -236,11 +290,31 @@ export default function SubmissionList() {
 
       {!loading && items.length > 0 && (
         <p className="text-sm text-slate-500">
-          <span className="font-semibold text-slate-700">{stats.total}</span> submissions
-          {' · '}
-          <span className="font-semibold text-slate-700">{stats.reviewed}</span> reviewed
-          {' · '}
-          <span className="font-semibold text-slate-700">{stats.withFeedback}</span> with feedback
+          {isAwaitingView ? (
+            <>
+              <span className="font-semibold text-slate-700">{stats.total}</span> awaiting
+              {' · '}
+              <span className="font-semibold text-slate-700">{stats.notSubmitted}</span> before deadline
+              {' · '}
+              <span className="font-semibold text-slate-700">{stats.overdue}</span> overdue
+            </>
+          ) : isRosterView ? (
+            <>
+              <span className="font-semibold text-slate-700">{stats.total}</span> students
+              {' · '}
+              <span className="font-semibold text-slate-700">{stats.submitted}</span> submitted
+              {' · '}
+              <span className="font-semibold text-slate-700">{stats.notSubmitted}</span> not submitted
+            </>
+          ) : (
+            <>
+              <span className="font-semibold text-slate-700">{stats.total}</span> submissions
+              {' · '}
+              <span className="font-semibold text-slate-700">{stats.reviewed}</span> reviewed
+              {' · '}
+              <span className="font-semibold text-slate-700">{stats.withFeedback}</span> with feedback
+            </>
+          )}
         </p>
       )}
 
@@ -248,13 +322,41 @@ export default function SubmissionList() {
         <LoadingPage />
       ) : items.length === 0 ? (
         <EmptyState
-          title="No submissions found"
-          description={hasActiveFilters ? 'Try adjusting your filters.' : 'Submissions appear here when students submit work.'}
+          title={isAwaitingView ? 'No students awaiting submission' : 'No submissions found'}
+          description={
+            isAwaitingView
+              ? assignmentId
+                ? 'Every student has submitted for this assignment.'
+                : 'Pick an assignment filter or publish a new assignment for students to complete.'
+              : hasActiveFilters
+                ? 'Try adjusting your filters.'
+                : 'Submissions appear here when students submit work.'
+          }
         />
+      ) : isAwaitingView ? (
+        <DataTable columns={['Student', 'Assignment', 'Due date', 'Status']}>
+          {items.map((item) => (
+            <tr key={`${item.student_id}-${item.assignment_id}`} className="transition hover:bg-slate-50/80">
+              <td className="px-4 py-3">
+                <div className="flex items-center gap-2.5">
+                  <UserAvatar name={item.username} size="sm" />
+                  <span className="font-medium text-slate-900">{item.username}</span>
+                </div>
+              </td>
+              <td className="px-4 py-3 text-slate-600">{item.assignment_title}</td>
+              <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-500">
+                {formatDateOnly(item.assignment_deadline)}
+              </td>
+              <td className="px-4 py-3">
+                <StatusBadge status={item.awaiting_status} />
+              </td>
+            </tr>
+          ))}
+        </DataTable>
       ) : (
         <DataTable columns={['Student', 'Assignment', 'Submitted', 'Status', 'Feedback', 'Actions']}>
           {items.map((s) => (
-            <tr key={s.id} className="transition hover:bg-slate-50/80">
+            <tr key={s.id ?? `${s.student_id}-${s.assignment_id}`} className="transition hover:bg-slate-50/80">
               <td className="px-4 py-3">
                 <div className="flex items-center gap-2.5">
                   <UserAvatar name={s.username} size="sm" />
@@ -262,12 +364,18 @@ export default function SubmissionList() {
                 </div>
               </td>
               <td className="px-4 py-3 text-slate-600">{s.assignment_title}</td>
-              <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-500">{formatDate(s.submitted_at)}</td>
+              <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-500">
+                {s.submitted_at ? formatDate(s.submitted_at) : '—'}
+              </td>
               <td className="px-4 py-3">
-                <StatusSelect
-                  value={s.status}
-                  onChange={(e) => updateStatus(s.id, e.target.value)}
-                />
+                {hasSubmission(s) ? (
+                  <StatusSelect
+                    value={s.status}
+                    onChange={(e) => updateStatus(s.id, e.target.value)}
+                  />
+                ) : (
+                  <StatusBadge status={s.status} />
+                )}
               </td>
               <td className="max-w-[180px] px-4 py-3">
                 {s.remarks ? (
@@ -277,47 +385,51 @@ export default function SubmissionList() {
                 )}
               </td>
               <td className="px-4 py-3">
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setFeedbackTarget(s)}
-                    title={s.remarks ? 'Edit feedback' : 'Add feedback'}
-                    className={actionBtn}
-                  >
-                    <MessageSquare size={15} />
-                  </button>
-                  {s.uploaded_file && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => setPreviewTarget(s)}
-                        title="Preview submission"
-                        className={actionBtn}
-                      >
-                        <Eye size={15} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDownload(s)}
-                        title="Download file"
-                        className={actionBtn}
-                      >
-                        <Download size={15} />
-                      </button>
-                    </>
-                  )}
-                  {s.github_url && (
-                    <a
-                      href={s.github_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      title="Open GitHub"
+                {hasSubmission(s) ? (
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setFeedbackTarget(s)}
+                      title={s.remarks ? 'Edit feedback' : 'Add feedback'}
                       className={actionBtn}
                     >
-                      <ExternalLink size={15} />
-                    </a>
-                  )}
-                </div>
+                      <MessageSquare size={15} />
+                    </button>
+                    {s.uploaded_file && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setPreviewTarget(s)}
+                          title="Preview submission"
+                          className={actionBtn}
+                        >
+                          <Eye size={15} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDownload(s)}
+                          title="Download file"
+                          className={actionBtn}
+                        >
+                          <Download size={15} />
+                        </button>
+                      </>
+                    )}
+                    {s.github_url && (
+                      <a
+                        href={s.github_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        title="Open GitHub"
+                        className={actionBtn}
+                      >
+                        <ExternalLink size={15} />
+                      </a>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-xs text-slate-400">No submission yet</span>
+                )}
               </td>
             </tr>
           ))}

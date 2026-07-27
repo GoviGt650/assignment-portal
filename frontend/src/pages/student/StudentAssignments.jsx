@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowRight, BookOpen, Calendar } from 'lucide-react';
 import PageHeader from '../../components/PageHeader';
 import { assignmentApi } from '../../services/api';
@@ -7,8 +7,9 @@ import { formatDateOnly } from '../../utils/helpers';
 import { EmptyState, FilterTabs, IconBox, LoadingPage, StatusBadge } from '../../components/UI';
 
 export default function StudentAssignments() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [assignments, setAssignments] = useState([]);
-  const [filter, setFilter] = useState('all');
+  const filter = searchParams.get('status') || 'all';
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -19,10 +20,18 @@ export default function StudentAssignments() {
       .finally(() => setLoading(false));
   }, [filter]);
 
+  const setFilter = (key) => {
+    const next = new URLSearchParams(searchParams);
+    if (key === 'all') next.delete('status');
+    else next.set('status', key);
+    setSearchParams(next);
+  };
+
   const tabs = [
     { key: 'all', label: 'All' },
     { key: 'active', label: 'Active' },
     { key: 'pending', label: 'Pending' },
+    { key: 'overdue', label: 'Overdue' },
     { key: 'completed', label: 'Submitted' },
   ];
 

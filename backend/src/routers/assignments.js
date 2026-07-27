@@ -51,7 +51,13 @@ router.get('/', authenticate, async (req, res, next) => {
     const countResult = await query(`SELECT COUNT(*) FROM assignments a ${whereClause}`, params);
     const result = await query(
       `SELECT a.*, u.username AS created_by_username,
-        (SELECT COUNT(*) FROM submissions s WHERE s.assignment_id = a.id) AS submission_count
+        (SELECT COUNT(*) FROM submissions s WHERE s.assignment_id = a.id) AS submission_count,
+        (SELECT COUNT(*) FROM users st WHERE st.role = 'student'
+          AND NOT EXISTS (
+            SELECT 1 FROM submissions s WHERE s.assignment_id = a.id AND s.student_id = st.id
+          )
+        ) AS awaiting_count,
+        (SELECT COUNT(*) FROM users WHERE role = 'student') AS student_count
        FROM assignments a
        JOIN users u ON u.id = a.created_by
        ${whereClause}

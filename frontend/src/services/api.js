@@ -50,6 +50,7 @@ export const assignmentApi = {
 
 export const submissionApi = {
   list: (params) => api.get('/submissions', { params }),
+  listAwaiting: (params) => api.get('/submissions/awaiting', { params }),
   get: (id) => api.get(`/submissions/${id}`),
   history: () => api.get('/submissions/history'),
   submit: (assignmentId, formData) => api.post(

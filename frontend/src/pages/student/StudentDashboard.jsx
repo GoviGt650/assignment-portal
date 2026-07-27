@@ -37,10 +37,10 @@ export default function StudentDashboard() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Active" value={data.active_assignments} icon={Clock} accent="brand" />
-        <StatCard label="Submitted" value={data.completed_assignments} icon={CheckCircle2} accent="green" />
-        <StatCard label="Pending" value={data.pending_assignments} icon={BookOpen} accent="amber" />
-        <StatCard label="Overdue" value={data.overdue_assignments} icon={AlertCircle} accent="red" />
+        <StatCard label="Active" value={data.active_assignments} icon={Clock} accent="brand" to="/student/assignments?status=active" />
+        <StatCard label="Submitted" value={data.completed_assignments} icon={CheckCircle2} accent="green" to="/student/assignments?status=completed" />
+        <StatCard label="Pending" value={data.pending_assignments} icon={BookOpen} accent="amber" to="/student/assignments?status=pending" />
+        <StatCard label="Overdue" value={data.overdue_assignments} icon={AlertCircle} accent="red" to="/student/assignments?status=overdue" />
       </div>
 
       <Panel

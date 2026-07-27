@@ -7,15 +7,18 @@ const router = Router();
 
 router.get('/teacher', authenticate, requireRole('teacher'), async (req, res, next) => {
   try {
-    const [students, assignments, submissions, pending] = await Promise.all([
+    const [students, assignments, submissions, awaiting] = await Promise.all([
       query(`SELECT COUNT(*) FROM users WHERE role = 'student'`),
       query(`SELECT COUNT(*) FROM assignments`),
       query(`SELECT COUNT(*) FROM submissions`),
       query(
-        `SELECT COUNT(*) FROM users u WHERE u.role = 'student' AND NOT EXISTS (
-          SELECT 1 FROM submissions s JOIN assignments a ON a.id = s.assignment_id
-          WHERE s.student_id = u.id AND a.deadline >= NOW()
-        )`
+        `SELECT COUNT(*) FROM users u
+         CROSS JOIN assignments a
+         WHERE u.role = 'student'
+         AND NOT EXISTS (
+           SELECT 1 FROM submissions s
+           WHERE s.student_id = u.id AND s.assignment_id = a.id
+         )`
       ),
     ]);
 
@@ -33,7 +36,7 @@ router.get('/teacher', authenticate, requireRole('teacher'), async (req, res, ne
       total_students: parseInt(students.rows[0].count, 10),
       total_assignments: parseInt(assignments.rows[0].count, 10),
       total_submissions: parseInt(submissions.rows[0].count, 10),
-      pending_submissions: parseInt(pending.rows[0].count, 10),
+      pending_submissions: parseInt(awaiting.rows[0].count, 10),
       recent_submissions: recentSubmissions.rows,
       upcoming_assignments: upcoming.rows,
     });

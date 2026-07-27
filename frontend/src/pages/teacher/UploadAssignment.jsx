@@ -112,13 +112,16 @@ export default function UploadAssignment() {
       formData.append('deadline', dateInputToDeadlineISO(deadline));
       formData.append('pdf', pdf);
 
-      await assignmentApi.create(formData);
+      const { data: created } = await assignmentApi.create(formData);
       setNotice({
         type: 'success',
         title: 'Assignment published',
-        message: `"${title.trim()}" is now live for students. Redirecting...`,
+        message: `"${title.trim()}" is now live. Showing students who still need to submit...`,
       });
-      setTimeout(() => navigate('/teacher/assignments'), 1800);
+      setTimeout(
+        () => navigate(`/teacher/submissions?assignment_id=${created.id}&status=awaiting`),
+        1800,
+      );
     } catch (err) {
       setNotice({
         type: 'error',

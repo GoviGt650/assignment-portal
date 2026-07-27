@@ -48,6 +48,7 @@ export function isPastDeadline(deadline) {
 
 export const STATUS_LABELS = {
   pending: 'Pending',
+  not_submitted: 'Not submitted',
   submitted: 'Submitted',
   reviewed: 'Reviewed',
   late: 'Late',
@@ -68,6 +69,7 @@ export function computeStudentStatus(assignment, submission) {
 export function statusColor(status) {
   const map = {
     pending: 'bg-amber-100 text-amber-800 ring-amber-200',
+    not_submitted: 'bg-amber-100 text-amber-800 ring-amber-200',
     submitted: 'bg-blue-100 text-blue-800 ring-blue-200',
     reviewed: 'bg-emerald-100 text-emerald-800 ring-emerald-200',
     late: 'bg-orange-100 text-orange-800 ring-orange-200',

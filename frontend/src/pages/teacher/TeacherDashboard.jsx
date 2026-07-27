@@ -37,10 +37,10 @@ export default function TeacherDashboard() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total Students" value={data.total_students} icon={Users} accent="brand" />
-        <StatCard label="Assignments" value={data.total_assignments} icon={BookOpen} accent="green" />
-        <StatCard label="Submissions" value={data.total_submissions} icon={ClipboardList} accent="amber" />
-        <StatCard label="Awaiting Submission" value={data.pending_submissions} icon={Users} accent="red" />
+        <StatCard label="Total Students" value={data.total_students} icon={Users} accent="brand" to="/teacher/students" />
+        <StatCard label="Assignments" value={data.total_assignments} icon={BookOpen} accent="green" to="/teacher/assignments" />
+        <StatCard label="Submissions" value={data.total_submissions} icon={ClipboardList} accent="amber" to="/teacher/submissions" />
+        <StatCard label="Awaiting Submission" value={data.pending_submissions} icon={Users} accent="red" to="/teacher/submissions?status=awaiting" />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
@@ -54,16 +54,17 @@ export default function TeacherDashboard() {
         >
           <div className="space-y-3">
             {data.recent_submissions.map((s) => (
-              <div
+              <Link
                 key={s.id}
-                className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/80 px-4 py-3 transition hover:border-brand-100 hover:bg-white"
+                to={`/teacher/submissions?assignment_id=${s.assignment_id}`}
+                className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/80 px-4 py-3 transition hover:-translate-y-0.5 hover:border-brand-100 hover:bg-white hover:shadow-sm"
               >
                 <div>
                   <p className="font-medium text-slate-900">{s.username}</p>
                   <p className="text-sm text-slate-500">{s.assignment_title}</p>
                 </div>
                 <StatusBadge status={s.status} />
-              </div>
+              </Link>
             ))}
             {data.recent_submissions.length === 0 && (
               <p className="text-sm text-slate-500">No submissions yet.</p>
@@ -81,13 +82,14 @@ export default function TeacherDashboard() {
         >
           <div className="space-y-3">
             {data.upcoming_assignments.map((a) => (
-              <div
+              <Link
                 key={a.id}
-                className="rounded-xl border border-slate-100 bg-slate-50/80 px-4 py-3 transition hover:border-brand-100 hover:bg-white"
+                to={`/teacher/submissions?assignment_id=${a.id}&status=awaiting`}
+                className="block rounded-xl border border-slate-100 bg-slate-50/80 px-4 py-3 transition hover:-translate-y-0.5 hover:border-brand-100 hover:bg-white hover:shadow-sm"
               >
                 <p className="font-medium text-slate-900">{a.title}</p>
                 <p className="text-sm text-slate-500">Due {formatDate(a.deadline)}</p>
-              </div>
+              </Link>
             ))}
             {data.upcoming_assignments.length === 0 && (
               <p className="text-sm text-slate-500">No upcoming assignments.</p>

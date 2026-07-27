@@ -41,6 +41,63 @@ router.get('/', authenticate, async (req, res, next) => {
   try {
     const { search = '', status, assignment_id, page = 1, limit = 20 } = req.query;
     const offset = (Math.max(1, parseInt(page, 10)) - 1) * parseInt(limit, 10);
+    const limitNum = parseInt(limit, 10);
+
+    if (req.user.role === 'teacher' && assignment_id && !status) {
+      const assignmentId = parseInt(assignment_id, 10);
+      const conditions = [`u.role = 'student'`, `a.id = $1`];
+      const params = [assignmentId];
+      let idx = 2;
+
+      if (search) {
+        conditions.push(`u.username ILIKE $${idx++}`);
+        params.push(`%${search}%`);
+      }
+
+      const where = `WHERE ${conditions.join(' AND ')}`;
+
+      const countResult = await query(
+        `SELECT COUNT(*) FROM users u
+         JOIN assignments a ON a.id = $1
+         ${where}`,
+        params
+      );
+
+      const result = await query(
+        `SELECT
+           s.id,
+           u.id AS student_id,
+           u.username,
+           a.id AS assignment_id,
+           a.title AS assignment_title,
+           a.deadline AS assignment_deadline,
+           s.github_url,
+           s.uploaded_file,
+           s.submitted_at,
+           s.remarks,
+           CASE
+             WHEN s.id IS NULL THEN
+               CASE WHEN a.deadline < NOW() THEN 'overdue' ELSE 'not_submitted' END
+             ELSE s.status
+           END AS status
+         FROM users u
+         JOIN assignments a ON a.id = $1
+         LEFT JOIN submissions s ON s.student_id = u.id AND s.assignment_id = a.id
+         ${where}
+         ORDER BY CASE WHEN s.id IS NULL THEN 1 ELSE 0 END, u.username ASC
+         LIMIT $${idx} OFFSET $${idx + 1}`,
+        [...params, limitNum, offset]
+      );
+
+      return res.json({
+        items: result.rows,
+        total: parseInt(countResult.rows[0].count, 10),
+        page: parseInt(page, 10),
+        limit: limitNum,
+        roster: true,
+      });
+    }
+
     const conditions = [];
     const params = [];
     let idx = 1;
@@ -79,6 +136,68 @@ router.get('/', authenticate, async (req, res, next) => {
        JOIN assignments a ON a.id = s.assignment_id
        ${where}
        ORDER BY s.submitted_at DESC
+       LIMIT $${idx} OFFSET $${idx + 1}`,
+      [...params, parseInt(limit, 10), offset]
+    );
+
+    res.json({
+      items: result.rows,
+      total: parseInt(countResult.rows[0].count, 10),
+      page: parseInt(page, 10),
+      limit: parseInt(limit, 10),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/awaiting', authenticate, requireRole('teacher'), async (req, res, next) => {
+  try {
+    const { search = '', assignment_id, page = 1, limit = 100 } = req.query;
+    const offset = (Math.max(1, parseInt(page, 10)) - 1) * parseInt(limit, 10);
+    const conditions = [`u.role = 'student'`];
+    const params = [];
+    let idx = 1;
+
+    conditions.push(`NOT EXISTS (
+      SELECT 1 FROM submissions s
+      WHERE s.student_id = u.id AND s.assignment_id = a.id
+    )`);
+
+    if (search) {
+      conditions.push(`(u.username ILIKE $${idx} OR a.title ILIKE $${idx})`);
+      params.push(`%${search}%`);
+      idx++;
+    }
+    if (assignment_id) {
+      conditions.push(`a.id = $${idx++}`);
+      params.push(parseInt(assignment_id, 10));
+    }
+
+    const where = `WHERE ${conditions.join(' AND ')}`;
+
+    const countResult = await query(
+      `SELECT COUNT(*) FROM users u
+       CROSS JOIN assignments a
+       ${where}`,
+      params
+    );
+
+    const result = await query(
+      `SELECT
+         u.id AS student_id,
+         u.username,
+         a.id AS assignment_id,
+         a.title AS assignment_title,
+         a.deadline AS assignment_deadline,
+         CASE
+           WHEN a.deadline < NOW() THEN 'overdue'
+           ELSE 'not_submitted'
+         END AS awaiting_status
+       FROM users u
+       CROSS JOIN assignments a
+       ${where}
+       ORDER BY a.deadline ASC, a.title ASC, u.username ASC
        LIMIT $${idx} OFFSET $${idx + 1}`,
       [...params, parseInt(limit, 10), offset]
     );

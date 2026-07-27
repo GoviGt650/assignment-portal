@@ -128,8 +128,10 @@ export default function ManageAssignments() {
                   <p className="mt-0.5 text-sm font-semibold text-slate-900">{formatDateOnly(a.deadline)}</p>
                 </div>
                 <div className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2.5">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Submissions</p>
-                  <p className="mt-0.5 text-sm font-semibold text-slate-900">{a.submission_count || 0}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Submitted</p>
+                  <p className="mt-0.5 text-sm font-semibold text-slate-900">
+                    {a.submission_count || 0}/{a.student_count || 0}
+                  </p>
                 </div>
               </div>
 
@@ -140,6 +142,13 @@ export default function ManageAssignments() {
                 >
                   <ClipboardList size={15} />
                   Submissions
+                </Link>
+                <Link
+                  to={`/teacher/submissions?assignment_id=${a.id}&status=awaiting`}
+                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm font-semibold text-amber-800 transition hover:bg-amber-100"
+                >
+                  <Users size={15} />
+                  Awaiting ({a.awaiting_count || 0})
                 </Link>
                 <button
                   type="button"
