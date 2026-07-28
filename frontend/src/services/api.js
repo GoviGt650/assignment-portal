@@ -31,6 +31,11 @@ api.interceptors.response.use(
 export const authApi = {
   login: (data) => api.post('/auth/login', data),
   register: (data) => api.post('/auth/register', data),
+  sendRegisterOtp: (email) => api.post('/auth/otp/send/register', { email }),
+  sendChangeEmailOtp: (email) => api.post('/auth/otp/send/change-email', { email }),
+  sendChangePasswordOtp: () => api.post('/auth/otp/send/change-password'),
+  updateEmail: (data) => api.patch('/auth/account/email', data),
+  updatePasswordWithOtp: (data) => api.patch('/auth/account/password', data),
   me: () => api.get('/auth/me'),
   updateProfile: (data) => api.patch('/auth/profile', data),
   getStudents: (params) => api.get('/auth/students', { params }),

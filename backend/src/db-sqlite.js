@@ -52,8 +52,33 @@ async function getDb() {
       UNIQUE (assignment_id, student_id)
     )
   `);
+  db.run(`
+    CREATE TABLE IF NOT EXISTS email_otps (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL,
+      otp_hash TEXT NOT NULL,
+      purpose TEXT NOT NULL,
+      user_id INTEGER,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_email_otps_email ON email_otps(email, purpose)`);
+  migrateUsersTable(db);
   persist();
   return db;
+}
+
+function migrateUsersTable(database) {
+  const columns = runSelect(database, 'PRAGMA table_info(users)', []);
+  const names = columns.map((col) => col.name);
+  if (!names.includes('email')) {
+    database.run('ALTER TABLE users ADD COLUMN email TEXT');
+  }
+  if (!names.includes('email_verified')) {
+    database.run('ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0');
+  }
+  database.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL');
 }
 
 function persist() {

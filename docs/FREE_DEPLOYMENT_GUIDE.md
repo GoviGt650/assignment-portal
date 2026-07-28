@@ -284,6 +284,32 @@ Good tutorials: search *"Oracle Cloud free tier deploy Node.js app"*.
 
 ---
 
+## Email OTP (Brevo — free, no domain required)
+
+Student registration uses email verification. The app sends OTP codes via **Brevo SMTP** (300 emails/day free).
+
+### Setup (~5 minutes)
+
+1. Sign up at [brevo.com](https://www.brevo.com) (free)
+2. **Senders & IP → Senders** → Add your Gmail/outlook → verify via the link they email you
+3. **SMTP & API → SMTP** → Generate an SMTP key (copy it — shown once)
+4. Add to **Render** env vars:
+
+```env
+SMTP_HOST=smtp-relay.brevo.com
+SMTP_PORT=587
+SMTP_USER=xxxxxxxxxx@smtp-brevo.com
+SMTP_PASS=your-brevo-smtp-key
+EMAIL_FROM=Terralogic ASP <your-login@gmail.com>
+```
+
+- `SMTP_USER` = the **Login** field on Brevo’s SMTP page (`xxx@smtp-brevo.com`)
+- `EMAIL_FROM` = your **verified sender** Gmail (not the SMTP login)
+
+**Without SMTP vars:** OTP codes print in Render logs only (fine for local dev, not for students).
+
+---
+
 ## Environment Variables Quick Reference
 
 ### Render (Backend)
@@ -296,6 +322,11 @@ JWT_SECRET=your-secret
 FRONTEND_URL=https://your-app.vercel.app
 TEACHER_USERNAME=teacher
 TEACHER_PASSWORD=your-strong-password
+SMTP_HOST=smtp-relay.brevo.com
+SMTP_PORT=587
+SMTP_USER=xxxxxxxxxx@smtp-brevo.com
+SMTP_PASS=your-brevo-smtp-key
+EMAIL_FROM=Terralogic ASP <your-email@gmail.com>
 PORT=8000
 ```
 

@@ -17,7 +17,8 @@ A centralized **Assignment Submission Portal (ASP)** for teachers and students. 
 - Search students by username
 
 ### Student
-- Register with username and password
+- Register with **email verification (OTP)**, username, and password
+- **Account settings** — change email or password with OTP confirmation
 - Dashboard and **card-based** assignment list with status filters
 - **Preview** assignment PDF in browser before downloading
 - Download assignment PDFs with clean filenames (assignment title)
@@ -112,6 +113,11 @@ App runs at **http://localhost:5173**
 | `MAX_FILE_SIZE_MB` | Max upload size (default 200) |
 | `TEACHER_USERNAME` | Seed teacher username |
 | `TEACHER_PASSWORD` | Seed teacher password |
+| `SMTP_HOST` | SMTP server (default `smtp-relay.brevo.com` for Brevo) |
+| `SMTP_PORT` | SMTP port (default `587`) |
+| `SMTP_USER` | Brevo **SMTP login** from dashboard (format `xxx@smtp-brevo.com`) — not your Gmail |
+| `SMTP_PASS` | Brevo SMTP key (from SMTP & API in dashboard) |
+| `EMAIL_FROM` | Verified sender, e.g. `Terralogic ASP <your-email@gmail.com>` |
 
 ### Frontend (`frontend/.env`)
 
@@ -123,7 +129,8 @@ App runs at **http://localhost:5173**
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/auth/register` | Student registration |
+| POST | `/api/auth/otp/send/register` | Send registration OTP to email |
+| POST | `/api/auth/register` | Student registration (email + OTP) |
 | POST | `/api/auth/login` | Login |
 | GET | `/api/auth/me` | Current user |
 | GET | `/api/assignments` | List assignments |

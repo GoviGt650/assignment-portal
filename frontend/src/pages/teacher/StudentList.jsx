@@ -33,7 +33,7 @@ export default function StudentList() {
       <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
         <input
           type="search"
-          placeholder="Search by username..."
+          placeholder="Search by username or email..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className={inputClass}
@@ -45,10 +45,11 @@ export default function StudentList() {
       ) : students.length === 0 ? (
         <EmptyState title="No students found" description="Students will appear here after they register." />
       ) : (
-        <DataTable columns={['Username', 'Registered']}>
+        <DataTable columns={['Username', 'Email', 'Registered']}>
           {students.map((s) => (
             <tr key={s.id} className="transition hover:bg-slate-50/80">
               <td className="px-6 py-4 font-medium text-slate-900">{s.username}</td>
+              <td className="px-6 py-4 text-slate-600">{s.email || '—'}</td>
               <td className="px-6 py-4 text-slate-600">{formatDate(s.created_at)}</td>
             </tr>
           ))}

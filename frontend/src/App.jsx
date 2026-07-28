@@ -10,6 +10,7 @@ import StudentAssignments from './pages/student/StudentAssignments';
 import AssignmentDetail from './pages/student/AssignmentDetail';
 import SubmitAssignment from './pages/student/SubmitAssignment';
 import SubmissionHistory from './pages/student/SubmissionHistory';
+import StudentProfile from './pages/student/StudentProfile';
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
 import ManageAssignments from './pages/teacher/ManageAssignments';
 import UploadAssignment from './pages/teacher/UploadAssignment';
@@ -32,6 +33,7 @@ export default function App() {
             <Route path="assignments/:id" element={<AssignmentDetail />} />
             <Route path="assignments/:id/submit" element={<SubmitAssignment />} />
             <Route path="history" element={<SubmissionHistory />} />
+            <Route path="profile" element={<StudentProfile />} />
           </Route>
 
           <Route path="/teacher" element={<ProtectedRoute role="teacher"><DashboardLayout /></ProtectedRoute>}>

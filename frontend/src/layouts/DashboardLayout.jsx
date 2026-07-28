@@ -74,6 +74,7 @@ export default function DashboardLayout() {
       <NavItem to="/student" icon={LayoutDashboard} onNavigate={closeMenu}>Dashboard</NavItem>
       <NavItem to="/student/assignments" icon={ClipboardList} onNavigate={closeMenu}>Assignments</NavItem>
       <NavItem to="/student/history" icon={History} onNavigate={closeMenu}>Submission History</NavItem>
+      <NavItem to="/student/profile" icon={Settings} onNavigate={closeMenu}>Account Settings</NavItem>
     </>
   );
 
