@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import PageHeader from '../../components/PageHeader';
 import OtpInput, { PasswordStrength } from '../../components/OtpInput';
+import OtpResendControl, { DevOtpNotice } from '../../components/OtpResendControl';
 import { authApi } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { formatDate } from '../../utils/helpers';
@@ -129,6 +130,7 @@ export default function StudentProfile() {
   const [newEmail, setNewEmail] = useState('');
   const [emailOtp, setEmailOtp] = useState('');
   const [emailOtpSent, setEmailOtpSent] = useState(false);
+  const [emailDevMode, setEmailDevMode] = useState(false);
   const [loadingEmail, setLoadingEmail] = useState(false);
   const [sendingEmailOtp, setSendingEmailOtp] = useState(false);
   const [emailCooldown, setEmailCooldown] = useCooldown();
@@ -136,6 +138,7 @@ export default function StudentProfile() {
   const [editingPassword, setEditingPassword] = useState(false);
   const [passwordOtp, setPasswordOtp] = useState('');
   const [passwordOtpSent, setPasswordOtpSent] = useState(false);
+  const [passwordDevMode, setPasswordDevMode] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loadingPassword, setLoadingPassword] = useState(false);
@@ -167,6 +170,7 @@ export default function StudentProfile() {
     try {
       const { data } = await authApi.sendChangeEmailOtp(newEmail.trim());
       setEmailOtpSent(true);
+      setEmailDevMode(Boolean(data.dev_mode));
       setEmailCooldown(60);
       setNotice({ type: 'success', title: 'Code sent', message: data.message });
     } catch (err) {
@@ -201,6 +205,7 @@ export default function StudentProfile() {
     try {
       const { data } = await authApi.sendChangePasswordOtp();
       setPasswordOtpSent(true);
+      setPasswordDevMode(Boolean(data.dev_mode));
       setPasswordCooldown(60);
       setNotice({ type: 'success', title: 'Code sent', message: data.message });
     } catch (err) {
@@ -300,19 +305,20 @@ export default function StudentProfile() {
                       onChange={(e) => {
                         setNewEmail(e.target.value);
                         setEmailOtpSent(false);
+                        setEmailDevMode(false);
                         setEmailOtp('');
                       }}
                       className={inputClass}
                       placeholder="New email address"
                     />
-                    <button
-                      type="button"
-                      onClick={handleSendEmailOtp}
-                      disabled={sendingEmailOtp || emailCooldown > 0 || !newEmail.trim()}
-                      className="w-full rounded-xl border border-brand-200 bg-white py-2.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 disabled:opacity-60"
-                    >
-                      {emailCooldown > 0 ? `Resend code in ${emailCooldown}s` : sendingEmailOtp ? 'Sending...' : emailOtpSent ? 'Resend verification code' : 'Send verification code'}
-                    </button>
+                    <DevOtpNotice visible={emailDevMode} />
+                    <OtpResendControl
+                      onSend={handleSendEmailOtp}
+                      sending={sendingEmailOtp}
+                      sent={emailOtpSent}
+                      cooldown={emailCooldown}
+                      disabled={!newEmail.trim()}
+                    />
                     <div>
                       <p className="mb-2 text-xs font-medium text-slate-600">Enter 6-digit code</p>
                       <OtpInput value={emailOtp} onChange={setEmailOtp} disabled={!emailOtpSent} />
@@ -380,14 +386,15 @@ export default function StudentProfile() {
                   </div>
                 ) : (
                   <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50/80 p-4">
-                    <button
-                      type="button"
-                      onClick={handleSendPasswordOtp}
-                      disabled={sendingPasswordOtp || passwordCooldown > 0}
-                      className="w-full rounded-xl border border-brand-200 bg-white py-2.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 disabled:opacity-60"
-                    >
-                      {passwordCooldown > 0 ? `Resend code in ${passwordCooldown}s` : sendingPasswordOtp ? 'Sending...' : passwordOtpSent ? 'Resend code to email' : 'Send code to my email'}
-                    </button>
+                    <DevOtpNotice visible={passwordDevMode} />
+                    <OtpResendControl
+                      onSend={handleSendPasswordOtp}
+                      sending={sendingPasswordOtp}
+                      sent={passwordOtpSent}
+                      cooldown={passwordCooldown}
+                      idleLabel="Send code to my email"
+                      sentLabel="Resend code to email"
+                    />
                     <div>
                       <p className="mb-2 text-xs font-medium text-slate-600">Verification code</p>
                       <OtpInput value={passwordOtp} onChange={setPasswordOtp} disabled={!passwordOtpSent} />

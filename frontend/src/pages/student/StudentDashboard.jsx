@@ -4,22 +4,16 @@ import { AlertCircle, ArrowRight, BookOpen, CheckCircle2, Clock } from 'lucide-r
 import PageHeader from '../../components/PageHeader';
 import { dashboardApi } from '../../services/api';
 import { formatDateOnly } from '../../utils/helpers';
-import { EmptyState, IconBox, LoadingPage, Panel, StatCard, StatusBadge } from '../../components/UI';
+import { useAsyncLoad } from '../../hooks/useAsyncLoad.jsx';
+import { EmptyState, IconBox, Panel, StatCard, StatusBadge } from '../../components/UI';
 
 export default function StudentDashboard() {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { renderState } = useAsyncLoad(
+    () => dashboardApi.student().then(({ data }) => data),
+    []
+  );
 
-  useEffect(() => {
-    dashboardApi.student()
-      .then(({ data: d }) => setData(d))
-      .finally(() => setLoading(false));
-  }, []);
-
-  if (loading) return <LoadingPage />;
-  if (!data) return null;
-
-  return (
+  return renderState((data) => (
     <div className="space-y-6">
       <PageHeader
         badge="Student Portal"
@@ -52,7 +46,10 @@ export default function StudentDashboard() {
         }
       >
         {data.recent_assignments.length === 0 ? (
-          <EmptyState title="No assignments yet" description="Check back when your teacher publishes new work." />
+          <EmptyState
+            title="No assignments yet"
+            description="Check back when your teacher publishes new work."
+          />
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
             {data.recent_assignments.map((a) => (
@@ -78,5 +75,5 @@ export default function StudentDashboard() {
         )}
       </Panel>
     </div>
-  );
+  ));
 }

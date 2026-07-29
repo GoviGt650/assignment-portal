@@ -9,6 +9,7 @@ import archiver from 'archiver';
 import fs from 'fs';
 import path from 'path';
 import { config } from '../config.js';
+import { sendSubmissionNotification } from '../services/emailService.js';
 
 const router = Router();
 
@@ -35,6 +36,34 @@ async function getAssignmentOrThrow(id) {
 function computeStatus(assignment, submittedAt) {
   if (new Date(submittedAt) > new Date(assignment.deadline)) return 'late';
   return 'submitted';
+}
+
+async function resolveTeacherNotifyEmail() {
+  if (config.email.teacherNotify) {
+    return config.email.teacherNotify.trim().toLowerCase();
+  }
+  const result = await query(
+    `SELECT email FROM users WHERE role = 'teacher' AND email IS NOT NULL ORDER BY id LIMIT 1`
+  );
+  return result.rows[0]?.email?.trim().toLowerCase() || null;
+}
+
+async function notifyTeacherOfSubmission({ studentId, assignment, status }) {
+  try {
+    const [studentResult, teacherEmail] = await Promise.all([
+      query('SELECT username FROM users WHERE id = $1', [studentId]),
+      resolveTeacherNotifyEmail(),
+    ]);
+    const studentUsername = studentResult.rows[0]?.username || 'A student';
+    await sendSubmissionNotification({
+      teacherEmail,
+      studentUsername,
+      assignmentTitle: assignment.title,
+      status,
+    });
+  } catch (err) {
+    console.error('[email] Could not notify teacher:', err.message);
+  }
 }
 
 router.get('/', authenticate, async (req, res, next) => {
@@ -78,7 +107,7 @@ router.get('/', authenticate, async (req, res, next) => {
            CASE
              WHEN s.id IS NULL THEN
                CASE WHEN a.deadline < NOW() THEN 'overdue' ELSE 'not_submitted' END
-             ELSE s.status
+             ELSE s.status::text
            END AS status
          FROM users u
          JOIN assignments a ON a.id = $1
@@ -314,6 +343,11 @@ async function handleSubmit(req, res, next) {
          submitted_at = NOW(), status = $3 WHERE id = $4 RETURNING *`,
         [github_url || null, uploadedFile, status, old.id]
       );
+      await notifyTeacherOfSubmission({
+        studentId: req.user.sub,
+        assignment,
+        status,
+      });
       return res.json(result.rows[0]);
     }
 
@@ -322,6 +356,11 @@ async function handleSubmit(req, res, next) {
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
       [assignmentId, req.user.sub, github_url || null, uploadedFile, status]
     );
+    await notifyTeacherOfSubmission({
+      studentId: req.user.sub,
+      assignment,
+      status,
+    });
     res.status(201).json(result.rows[0]);
   } catch (err) {
     next(err);
@@ -385,7 +424,7 @@ router.patch(
         `UPDATE submissions
          SET remarks = $1,
              status = CASE
-               WHEN $2 IS NOT NULL AND status IN ('submitted', 'late') THEN 'reviewed'
+               WHEN $2::text IS NOT NULL AND status IN ('submitted', 'late') THEN 'reviewed'::submission_status
                ELSE status
              END
          WHERE id = $3 RETURNING *`,
