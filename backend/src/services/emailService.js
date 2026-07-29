@@ -3,17 +3,36 @@ import { config } from '../config.js';
 
 let transporter;
 
-function isEmailConfigured() {
+function hasSmtpConfig() {
   return Boolean(config.email.smtp.user && config.email.smtp.pass);
 }
 
+function hasBrevoApiConfig() {
+  return Boolean(config.email.brevoApiKey);
+}
+
+function isEmailConfigured() {
+  return hasBrevoApiConfig() || hasSmtpConfig();
+}
+
+function parseFromAddress(from) {
+  const value = String(from || '').trim();
+  const match = value.match(/^(.+?)\s*<([^>]+)>$/);
+  if (match) {
+    return { name: match[1].trim(), email: match[2].trim() };
+  }
+  return { name: 'Academy ASP', email: value };
+}
+
 function getTransporter() {
-  if (!isEmailConfigured()) return null;
+  if (!hasSmtpConfig()) return null;
   if (!transporter) {
     transporter = nodemailer.createTransport({
       host: config.email.smtp.host,
       port: config.email.smtp.port,
       secure: config.email.smtp.secure,
+      connectionTimeout: 15000,
+      greetingTimeout: 15000,
       auth: {
         user: config.email.smtp.user,
         pass: config.email.smtp.pass,
@@ -21,6 +40,88 @@ function getTransporter() {
     });
   }
   return transporter;
+}
+
+async function sendViaBrevoApi({ to, subject, text, html }) {
+  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'api-key': config.email.brevoApiKey,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({
+      sender: parseFromAddress(config.email.from),
+      to: [{ email: to }],
+      subject,
+      htmlContent: html,
+      textContent: text,
+    }),
+  });
+
+  const body = await response.text();
+  if (!response.ok) {
+    throw new Error(body || `Brevo API error ${response.status}`);
+  }
+
+  try {
+    return JSON.parse(body);
+  } catch {
+    return { messageId: body || 'sent' };
+  }
+}
+
+async function sendViaSmtp({ to, subject, text, html }) {
+  const transport = getTransporter();
+  if (!transport) return null;
+  return transport.sendMail({
+    from: config.email.from,
+    to,
+    subject,
+    text,
+    html,
+  });
+}
+
+function formatEmailError(err) {
+  const msg = String(err.message || '');
+  if (/sender.*not valid|validate your sender|authenticate your domain/i.test(msg)) {
+    return `Brevo rejected the sender "${config.email.from}". In Brevo go to Senders & IP → Senders, add that exact email, verify it via the link, then restart the backend.`;
+  }
+  if (/connection timeout|timed out/i.test(msg)) {
+    return 'Email service timed out. On Render, set BREVO_API_KEY (Brevo → SMTP & API → API Keys) instead of SMTP only.';
+  }
+  return msg || 'Could not send email';
+}
+
+async function deliverEmail({ to, subject, text, html, logLabel }) {
+  if (!isEmailConfigured()) {
+    console.log(`[DEV ${logLabel}] To: ${to} | ${text.replace(/\n/g, ' | ')}`);
+    return { dev: true };
+  }
+
+  if (hasBrevoApiConfig()) {
+    try {
+      const info = await sendViaBrevoApi({ to, subject, text, html });
+      console.log(`[email] ${logLabel} sent via Brevo API to ${to} messageId=${info.messageId || 'n/a'}`);
+      return { dev: false, via: 'brevo-api' };
+    } catch (err) {
+      console.error(`[email] Brevo API failed for ${to}:`, err.message);
+      if (!hasSmtpConfig()) {
+        throw new Error(formatEmailError(err));
+      }
+      console.warn('[email] Falling back to SMTP after Brevo API failure.');
+    }
+  }
+
+  try {
+    const info = await sendViaSmtp({ to, subject, text, html });
+    console.log(`[email] ${logLabel} sent via SMTP to ${to} messageId=${info?.messageId || 'n/a'}`);
+    return { dev: false, via: 'smtp' };
+  } catch (err) {
+    console.error(`[email] SMTP failed for ${to}:`, err.message);
+    throw new Error(formatEmailError(err));
+  }
 }
 
 const purposeLabels = {
@@ -96,10 +197,13 @@ function buildNotificationHtml({ title, lines }) {
 }
 
 export function getEmailStatus() {
-  return {
-    configured: isEmailConfigured(),
-    mode: isEmailConfigured() ? 'smtp' : 'dev-fallback',
-  };
+  if (hasBrevoApiConfig()) {
+    return { configured: true, mode: 'brevo-api' };
+  }
+  if (hasSmtpConfig()) {
+    return { configured: true, mode: 'smtp' };
+  }
+  return { configured: false, mode: 'dev-fallback' };
 }
 
 export async function sendOtpEmail(to, otp, purpose) {
@@ -107,32 +211,13 @@ export async function sendOtpEmail(to, otp, purpose) {
   const subject = `${otp} - Academy ASP verification code`;
   const text = `Your Academy ASP verification code is ${otp}. Use it to ${label}. Expires in 10 minutes.`;
 
-  const transport = getTransporter();
-  if (!transport) {
-    console.log(`[DEV OTP] To: ${to} | Code: ${otp} | Purpose: ${purpose}`);
-    return { dev: true };
-  }
-
-  try {
-    const info = await transport.sendMail({
-      from: config.email.from,
-      to,
-      subject,
-      text,
-      html: buildEmailHtml(otp, label),
-    });
-    console.log(`[email] OTP sent to ${to} (${purpose}) messageId=${info.messageId || 'n/a'}`);
-    return { dev: false };
-  } catch (err) {
-    console.error(`[email] OTP failed for ${to} (${purpose}):`, err.message);
-    const msg = String(err.message || '');
-    if (/sender.*not valid|validate your sender|authenticate your domain/i.test(msg)) {
-      throw new Error(
-        `Brevo rejected the sender "${config.email.from}". In Brevo go to Senders & IP → Senders, add that exact email, verify it via the link, then restart the backend.`
-      );
-    }
-    throw new Error(msg || 'Could not send verification email');
-  }
+  return deliverEmail({
+    to,
+    subject,
+    text,
+    html: buildEmailHtml(otp, label),
+    logLabel: `OTP (${purpose})`,
+  });
 }
 
 export async function sendSubmissionNotification({ teacherEmail, studentUsername, assignmentTitle, status }) {
@@ -145,15 +230,8 @@ export async function sendSubmissionNotification({ teacherEmail, studentUsername
     'Sign in to the teacher portal to review.',
   ].join('\n');
 
-  const transport = getTransporter();
-  if (!transport) {
-    console.log(`[DEV NOTIFY] To: ${teacherEmail} | ${text.replace(/\n/g, ' | ')}`);
-    return { dev: true };
-  }
-
   try {
-    await transport.sendMail({
-      from: config.email.from,
+    return await deliverEmail({
       to: teacherEmail,
       subject,
       text,
@@ -165,8 +243,8 @@ export async function sendSubmissionNotification({ teacherEmail, studentUsername
           'Sign in to the teacher portal to review and add feedback.',
         ],
       }),
+      logLabel: 'Submission notification',
     });
-    return { dev: false };
   } catch (err) {
     console.error('[email] Submission notification failed:', err.message);
     return { error: err.message };

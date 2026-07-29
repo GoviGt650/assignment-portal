@@ -60,9 +60,13 @@ app.use(express.urlencoded({ extended: true }));
 await initStorage();
 
 if (isEmailConfigured()) {
-  console.log('[email] Brevo SMTP configured.');
+  const emailMode = getEmailStatus().mode;
+  console.log(`[email] Brevo configured (${emailMode}).`);
   console.log(`[email] Sender (EMAIL_FROM): ${config.email.from}`);
   console.log('[email] This address must be verified under Brevo → Senders & IP → Senders.');
+  if (emailMode === 'smtp') {
+    console.log('[email] Tip: on Render, prefer BREVO_API_KEY over SMTP to avoid connection timeouts.');
+  }
 } else {
   console.log('[email] SMTP not set — OTP codes will print in the console.');
 }
