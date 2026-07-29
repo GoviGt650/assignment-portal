@@ -398,15 +398,15 @@ router.patch(
         throw new AuthError('Current password is incorrect');
       }
 
-      await verifyOtp({ email, purpose: 'setup_email', otp });
-
       const taken = await query('SELECT id FROM users WHERE email = $1', [email]);
       if (taken.rows.length > 0) {
         throw new ValidationError('This email is already registered');
       }
 
+      await verifyOtp({ email, purpose: 'setup_email', otp });
+
       const result = await query(
-        `UPDATE users SET email = $1, email_verified = 1 WHERE id = $2
+        `UPDATE users SET email = $1, email_verified = true WHERE id = $2
          RETURNING id, username, role, email, email_verified, created_at`,
         [email, user.id]
       );
@@ -485,8 +485,6 @@ router.patch(
         throw new ValidationError('Add a verified email to your account first');
       }
 
-      await verifyOtp({ email: user.email, purpose: 'change_username', otp });
-
       const normalized = newUsername.trim().toLowerCase();
       if (normalized === user.username) {
         throw new ValidationError('This is already your username');
@@ -499,6 +497,8 @@ router.patch(
       if (existing.rows.length > 0) {
         throw new ValidationError('Username already taken');
       }
+
+      await verifyOtp({ email: user.email, purpose: 'change_username', otp });
 
       const result = await query(
         `UPDATE users SET username = $1 WHERE id = $2

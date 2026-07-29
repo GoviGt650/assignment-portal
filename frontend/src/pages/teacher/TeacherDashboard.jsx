@@ -53,7 +53,7 @@ export default function TeacherDashboard() {
                 className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/80 px-4 py-3 transition hover:-translate-y-0.5 hover:border-brand-100 hover:bg-white hover:shadow-sm"
               >
                 <div>
-                  <p className="font-medium text-slate-900">{s.student_username}</p>
+                  <p className="font-medium text-slate-900">{s.username}</p>
                   <p className="text-sm text-slate-500">{s.assignment_title}</p>
                 </div>
                 <div className="text-right">
@@ -67,7 +67,7 @@ export default function TeacherDashboard() {
 
         <Panel title="Upcoming Deadlines">
           <div className="space-y-3">
-            {data.upcoming_deadlines.map((a) => (
+            {(data.upcoming_assignments || []).map((a) => (
               <Link
                 key={a.id}
                 to={`/teacher/assignments`}
