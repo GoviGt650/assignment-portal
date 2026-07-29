@@ -61,11 +61,9 @@ export function DevOtpNotice({ visible }) {
 
   return (
     <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-      <p className="font-semibold">Development mode — email not configured</p>
+      <p className="font-semibold">Email not configured</p>
       <p className="mt-1 leading-relaxed text-amber-800">
-        The 6-digit code is printed in the <strong>backend terminal</strong> as{' '}
-        <code className="rounded bg-amber-100 px-1.5 py-0.5 text-xs">[DEV OTP]</code>.
-        Ask whoever runs the server to share the code, or add SMTP settings to <code className="text-xs">backend/.env</code>.
+        Verification codes are not sent by email until SMTP is configured on the server.
       </p>
     </div>
   );

@@ -3,7 +3,7 @@ import { BookOpen, ClipboardList, Upload, Users } from 'lucide-react';
 import PageHeader from '../../components/PageHeader';
 import { dashboardApi } from '../../services/api';
 import { formatDate } from '../../utils/helpers';
-import { useAsyncLoad } from '../../hooks/useAsyncLoad';
+import { useAsyncLoad } from '../../hooks/useAsyncLoad.jsx';
 import { Panel, StatCard, StatusBadge } from '../../components/UI';
 
 export default function TeacherDashboard() {

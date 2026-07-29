@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { ArrowRight, BookOpen, Lock, User } from 'lucide-react';
 import AuthBrandPanel from '../components/AuthBrandPanel';
 import { useAuth } from '../context/AuthContext';
+import { teacherHomePath } from '../layouts/TeacherLayout';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -18,7 +19,7 @@ export default function LoginPage() {
     try {
       const user = await login({ username, password });
       toast.success(`Welcome back, ${user.username}!`);
-      navigate(user.role === 'teacher' ? '/teacher' : '/student');
+      navigate(teacherHomePath(user));
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -127,7 +128,7 @@ export default function LoginPage() {
           </div>
 
           <p className="mt-8 text-center text-xs text-slate-400">
-            Teachers use credentials provided by admin · Students can self-register
+            Teachers: add email on first sign-in · Forgot password works after email is set
           </p>
         </div>
       </div>

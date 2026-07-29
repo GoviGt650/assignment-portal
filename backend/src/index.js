@@ -47,6 +47,8 @@ await initStorage();
 
 if (isEmailConfigured()) {
   console.log('[email] Brevo SMTP configured.');
+  console.log(`[email] Sender (EMAIL_FROM): ${config.email.from}`);
+  console.log('[email] This address must be verified under Brevo → Senders & IP → Senders.');
 } else {
   console.log('[email] SMTP not set — OTP codes will print in the console.');
 }

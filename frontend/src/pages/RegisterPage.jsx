@@ -5,71 +5,32 @@ import {
   ArrowLeft,
   ArrowRight,
   BookOpen,
-  CheckCircle2,
   Lock,
   Mail,
   ShieldCheck,
   User,
 } from 'lucide-react';
 import AuthBrandPanel from '../components/AuthBrandPanel';
+import AuthStepIndicator, { MaskedEmailBadge } from '../components/AuthStepIndicator';
 import OtpInput, { PasswordStrength } from '../components/OtpInput';
 import OtpResendControl, { DevOtpNotice } from '../components/OtpResendControl';
 import { authApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { maskEmail } from '../utils/maskEmail';
 
 const fieldClass =
   'w-full rounded-xl border border-slate-200 bg-slate-50/50 py-3.5 pl-11 pr-4 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10';
 
 const steps = [
-  { id: 1, title: 'Verify email', icon: Mail },
-  { id: 2, title: 'Create account', icon: User },
+  { id: 1, title: 'Your email', icon: Mail },
+  { id: 2, title: 'Verify code', icon: ShieldCheck },
+  { id: 3, title: 'Your account', icon: User },
 ];
-
-function StepIndicator({ currentStep }) {
-  return (
-    <div className="mb-8">
-      <div className="flex items-center justify-between gap-3">
-        {steps.map((step, index) => {
-          const Icon = step.icon;
-          const active = currentStep === step.id;
-          const done = currentStep > step.id;
-          return (
-            <div key={step.id} className="flex flex-1 items-center gap-3">
-              <div className="flex min-w-0 flex-1 flex-col items-center text-center sm:flex-row sm:items-center sm:text-left">
-                <div
-                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 transition ${
-                    done
-                      ? 'border-emerald-500 bg-emerald-500 text-white'
-                      : active
-                        ? 'border-brand-600 bg-brand-600 text-white shadow-md shadow-brand-600/25'
-                        : 'border-slate-200 bg-white text-slate-400'
-                  }`}
-                >
-                  {done ? <CheckCircle2 size={18} /> : <Icon size={18} />}
-                </div>
-                <div className="mt-2 min-w-0 sm:ml-3 sm:mt-0">
-                  <p className={`text-xs font-semibold uppercase tracking-wide ${active || done ? 'text-brand-700' : 'text-slate-400'}`}>
-                    Step {step.id}
-                  </p>
-                  <p className={`truncate text-sm font-semibold ${active || done ? 'text-slate-900' : 'text-slate-500'}`}>
-                    {step.title}
-                  </p>
-                </div>
-              </div>
-              {index < steps.length - 1 && (
-                <div className={`hidden h-0.5 flex-1 rounded-full sm:block ${done ? 'bg-emerald-400' : 'bg-slate-200'}`} />
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 export default function RegisterPage() {
   const [step, setStep] = useState(1);
   const [email, setEmail] = useState('');
+  const [maskedEmail, setMaskedEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -98,6 +59,7 @@ export default function RegisterPage() {
       const { data } = await authApi.sendRegisterOtp(email.trim());
       setOtpSent(true);
       setDevMode(Boolean(data.dev_mode));
+      setMaskedEmail(data.masked_email || maskEmail(email.trim()));
       setCooldown(60);
       toast.success(data.message);
     } catch (err) {
@@ -107,16 +69,35 @@ export default function RegisterPage() {
     }
   };
 
-  const handleContinue = () => {
-    if (!otpSent) {
-      toast.error('Send a verification code to your email first');
+  const handleStep1Continue = async () => {
+    if (!email.trim()) {
+      toast.error('Enter your email address');
       return;
     }
-    if (otp.length !== 6) {
+    setSendingOtp(true);
+    setOtp('');
+    setOtpSent(false);
+    try {
+      const { data } = await authApi.sendRegisterOtp(email.trim());
+      setOtpSent(true);
+      setDevMode(Boolean(data.dev_mode));
+      setMaskedEmail(data.masked_email || maskEmail(email.trim()));
+      setCooldown(60);
+      setStep(2);
+      toast.success(data.message);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  const handleStep2Continue = () => {
+    if (!otpSent || otp.length !== 6) {
       toast.error('Enter the 6-digit verification code');
       return;
     }
-    setStep(2);
+    setStep(3);
   };
 
   const handleSubmit = async (e) => {
@@ -138,11 +119,17 @@ export default function RegisterPage() {
     } catch (err) {
       toast.error(err.message);
       if (err.message.toLowerCase().includes('code') || err.message.toLowerCase().includes('otp')) {
-        setStep(1);
+        setStep(2);
       }
     } finally {
       setLoading(false);
     }
+  };
+
+  const stepCopy = {
+    1: 'Start with your email address. We will send a verification code.',
+    2: 'Enter the code sent to your email to continue.',
+    3: 'Choose a username and password to finish.',
   };
 
   return (
@@ -150,8 +137,8 @@ export default function RegisterPage() {
       <AuthBrandPanel
         badge="Secure student onboarding"
         headline="Create your account."
-        highlight="Verified in two easy steps."
-        description="Verify your email, set up your profile, and start submitting assignments through one professional portal."
+        highlight="Verified in three easy steps."
+        description="Verify your email, confirm with OTP, then set up your profile."
         features={[
           'Email verification with one-time code',
           'Secure assignment submissions',
@@ -177,16 +164,12 @@ export default function RegisterPage() {
           <div className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-xl shadow-slate-200/50 sm:p-8 lg:p-10">
             <div className="mb-2">
               <h2 className="text-2xl font-bold tracking-tight text-slate-900">Create account</h2>
-              <p className="mt-2 text-sm text-slate-500">
-                {step === 1
-                  ? 'We will send a verification code to your email.'
-                  : 'Choose a username and password to finish setup.'}
-              </p>
+              <p className="mt-2 text-sm text-slate-500">{stepCopy[step]}</p>
             </div>
 
-            <StepIndicator currentStep={step} />
+            <AuthStepIndicator steps={steps} currentStep={step} />
 
-            {step === 1 ? (
+            {step === 1 && (
               <div className="space-y-6">
                 <div className="rounded-2xl border border-brand-100 bg-brand-50/60 p-4">
                   <div className="flex gap-3">
@@ -217,6 +200,7 @@ export default function RegisterPage() {
                         setOtpSent(false);
                         setDevMode(false);
                         setOtp('');
+                        setMaskedEmail('');
                       }}
                       placeholder="you@example.com"
                       autoComplete="email"
@@ -226,7 +210,36 @@ export default function RegisterPage() {
                   </div>
                 </div>
 
+                <button
+                  type="button"
+                  onClick={handleStep1Continue}
+                  disabled={sendingOtp || !email.trim()}
+                  className="group flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 py-3.5 text-sm font-semibold text-white shadow-lg shadow-brand-600/25 transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {sendingOtp ? 'Sending code...' : (
+                    <>
+                      Continue
+                      <ArrowRight size={16} className="transition group-hover:translate-x-0.5" />
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {step === 2 && (
+              <div className="space-y-5">
                 <DevOtpNotice visible={devMode} />
+                <MaskedEmailBadge maskedEmail={maskedEmail || maskEmail(email)} label="Verification code sent to" />
+
+                <div>
+                  <label className="mb-3 block text-sm font-medium text-slate-700">Enter 6-digit code</label>
+                  <OtpInput value={otp} onChange={setOtp} disabled={!otpSent} />
+                  <p className="mt-3 text-xs leading-relaxed text-slate-500">
+                    {devMode
+                      ? 'Development mode: ask the person running the backend for the code in the terminal.'
+                      : 'Check your inbox and spam folder. The code expires in 10 minutes.'}
+                  </p>
+                </div>
 
                 <OtpResendControl
                   onSend={handleSendOtp}
@@ -236,110 +249,65 @@ export default function RegisterPage() {
                   disabled={!email.trim()}
                 />
 
-                <div>
-                  <label className="mb-3 block text-sm font-medium text-slate-700">
-                    Enter 6-digit code
-                  </label>
-                  <OtpInput value={otp} onChange={setOtp} disabled={!otpSent} />
-                  <p className="mt-3 text-xs leading-relaxed text-slate-500">
-                    {devMode
-                      ? 'Development mode: ask the person running the backend for the code in the terminal.'
-                      : otpSent
-                        ? 'Check your inbox and spam folder. The code expires in 10 minutes.'
-                        : 'Send a code first, then enter it here to continue.'}
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleContinue}
-                  disabled={!otpSent || otp.length !== 6}
-                  className="group flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 py-3.5 text-sm font-semibold text-white shadow-lg shadow-brand-600/25 transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Continue
-                  <ArrowRight size={16} className="transition group-hover:translate-x-0.5" />
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800">
-                  Email verified: <span className="font-semibold">{email}</span>
-                </div>
-
-                <div>
-                  <label htmlFor="username" className="mb-2 block text-sm font-medium text-slate-700">
-                    Username
-                  </label>
-                  <div className="relative">
-                    <User className="pointer-events-none absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-slate-400" />
-                    <input
-                      id="username"
-                      type="text"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      minLength={3}
-                      placeholder="Choose a unique username"
-                      autoComplete="username"
-                      className={fieldClass}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="password" className="mb-2 block text-sm font-medium text-slate-700">
-                    Password
-                  </label>
-                  <div className="relative">
-                    <Lock className="pointer-events-none absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-slate-400" />
-                    <input
-                      id="password"
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      minLength={6}
-                      placeholder="Minimum 6 characters"
-                      autoComplete="new-password"
-                      className={fieldClass}
-                      required
-                    />
-                  </div>
-                  <PasswordStrength password={password} />
-                </div>
-
-                <div>
-                  <label htmlFor="confirm" className="mb-2 block text-sm font-medium text-slate-700">
-                    Confirm password
-                  </label>
-                  <div className="relative">
-                    <Lock className="pointer-events-none absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-slate-400" />
-                    <input
-                      id="confirm"
-                      type="password"
-                      value={confirm}
-                      onChange={(e) => setConfirm(e.target.value)}
-                      placeholder="Re-enter your password"
-                      autoComplete="new-password"
-                      className={fieldClass}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row">
+                <div className="flex flex-col-reverse gap-3 sm:flex-row">
                   <button
                     type="button"
-                    onClick={() => setStep(1)}
+                    onClick={() => { setStep(1); setOtp(''); }}
                     className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-3.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
                   >
                     <ArrowLeft size={16} />
                     Back
                   </button>
                   <button
-                    type="submit"
-                    disabled={loading}
-                    className="group inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-brand-600 py-3.5 text-sm font-semibold text-white shadow-lg shadow-brand-600/25 transition hover:bg-brand-700 disabled:opacity-60"
+                    type="button"
+                    onClick={handleStep2Continue}
+                    disabled={!otpSent || otp.length !== 6}
+                    className="group inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-brand-600 py-3.5 text-sm font-semibold text-white shadow-lg shadow-brand-600/25 transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
                   >
+                    Continue
+                    <ArrowRight size={16} className="transition group-hover:translate-x-0.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {step === 3 && (
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800">
+                  Email verified: <span className="font-semibold">{maskedEmail || maskEmail(email)}</span>
+                </div>
+
+                <div>
+                  <label htmlFor="username" className="mb-2 block text-sm font-medium text-slate-700">Username</label>
+                  <div className="relative">
+                    <User className="pointer-events-none absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-slate-400" />
+                    <input id="username" type="text" value={username} onChange={(e) => setUsername(e.target.value)} minLength={3} placeholder="Choose a unique username" autoComplete="username" className={fieldClass} required />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="password" className="mb-2 block text-sm font-medium text-slate-700">Password</label>
+                  <div className="relative">
+                    <Lock className="pointer-events-none absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-slate-400" />
+                    <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={6} placeholder="Minimum 6 characters" autoComplete="new-password" className={fieldClass} required />
+                  </div>
+                  <PasswordStrength password={password} />
+                </div>
+
+                <div>
+                  <label htmlFor="confirm" className="mb-2 block text-sm font-medium text-slate-700">Confirm password</label>
+                  <div className="relative">
+                    <Lock className="pointer-events-none absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-slate-400" />
+                    <input id="confirm" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Re-enter your password" autoComplete="new-password" className={fieldClass} required />
+                  </div>
+                </div>
+
+                <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row">
+                  <button type="button" onClick={() => setStep(2)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-3.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
+                    <ArrowLeft size={16} />
+                    Back
+                  </button>
+                  <button type="submit" disabled={loading} className="group inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-brand-600 py-3.5 text-sm font-semibold text-white shadow-lg shadow-brand-600/25 transition hover:bg-brand-700 disabled:opacity-60">
                     {loading ? 'Creating account...' : (
                       <>
                         Create account
@@ -354,9 +322,7 @@ export default function RegisterPage() {
             <div className="mt-8 border-t border-slate-100 pt-6 text-center">
               <p className="text-sm text-slate-500">
                 Already have an account?{' '}
-                <Link to="/login" className="font-semibold text-brand-600 hover:underline">
-                  Sign in
-                </Link>
+                <Link to="/login" className="font-semibold text-brand-600 hover:underline">Sign in</Link>
               </p>
             </div>
           </div>

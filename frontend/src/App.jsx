@@ -18,6 +18,8 @@ import UploadAssignment from './pages/teacher/UploadAssignment';
 import SubmissionList from './pages/teacher/SubmissionList';
 import StudentList from './pages/teacher/StudentList';
 import TeacherProfile from './pages/teacher/TeacherProfile';
+import TeacherSetupEmail from './pages/teacher/TeacherSetupEmail';
+import TeacherLayout from './layouts/TeacherLayout';
 
 export default function App() {
   return (
@@ -38,13 +40,16 @@ export default function App() {
             <Route path="profile" element={<StudentProfile />} />
           </Route>
 
-          <Route path="/teacher" element={<ProtectedRoute role="teacher"><DashboardLayout /></ProtectedRoute>}>
-            <Route index element={<TeacherDashboard />} />
-            <Route path="assignments" element={<ManageAssignments />} />
-            <Route path="upload" element={<UploadAssignment />} />
-            <Route path="submissions" element={<SubmissionList />} />
-            <Route path="students" element={<StudentList />} />
-            <Route path="profile" element={<TeacherProfile />} />
+          <Route path="/teacher" element={<ProtectedRoute role="teacher"><TeacherLayout /></ProtectedRoute>}>
+            <Route path="setup-email" element={<TeacherSetupEmail />} />
+            <Route element={<DashboardLayout />}>
+              <Route index element={<TeacherDashboard />} />
+              <Route path="assignments" element={<ManageAssignments />} />
+              <Route path="upload" element={<UploadAssignment />} />
+              <Route path="submissions" element={<SubmissionList />} />
+              <Route path="students" element={<StudentList />} />
+              <Route path="profile" element={<TeacherProfile />} />
+            </Route>
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />

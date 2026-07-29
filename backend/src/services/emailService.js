@@ -25,8 +25,10 @@ function getTransporter() {
 
 const purposeLabels = {
   register: 'complete your student registration',
+  setup_email: 'verify your teacher account email',
   change_email: 'confirm your new email address',
   change_password: 'change your password',
+  change_username: 'change your username',
   forgot_password: 'reset your password',
 };
 
@@ -112,16 +114,24 @@ export async function sendOtpEmail(to, otp, purpose) {
   }
 
   try {
-    await transport.sendMail({
+    const info = await transport.sendMail({
       from: config.email.from,
       to,
       subject,
       text,
       html: buildEmailHtml(otp, label),
     });
+    console.log(`[email] OTP sent to ${to} (${purpose}) messageId=${info.messageId || 'n/a'}`);
     return { dev: false };
   } catch (err) {
-    throw new Error(err.message || 'Could not send verification email');
+    console.error(`[email] OTP failed for ${to} (${purpose}):`, err.message);
+    const msg = String(err.message || '');
+    if (/sender.*not valid|validate your sender|authenticate your domain/i.test(msg)) {
+      throw new Error(
+        `Brevo rejected the sender "${config.email.from}". In Brevo go to Senders & IP → Senders, add that exact email, verify it via the link, then restart the backend.`
+      );
+    }
+    throw new Error(msg || 'Could not send verification email');
   }
 }
 

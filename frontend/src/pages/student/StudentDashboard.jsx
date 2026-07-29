@@ -4,7 +4,7 @@ import { AlertCircle, ArrowRight, BookOpen, CheckCircle2, Clock } from 'lucide-r
 import PageHeader from '../../components/PageHeader';
 import { dashboardApi } from '../../services/api';
 import { formatDateOnly } from '../../utils/helpers';
-import { useAsyncLoad } from '../../hooks/useAsyncLoad';
+import { useAsyncLoad } from '../../hooks/useAsyncLoad.jsx';
 import { EmptyState, IconBox, Panel, StatCard, StatusBadge } from '../../components/UI';
 
 export default function StudentDashboard() {
