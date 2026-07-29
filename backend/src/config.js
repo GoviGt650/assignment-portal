@@ -2,10 +2,10 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-dotenv.config();
-
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.join(__dirname, '..');
+
+dotenv.config({ path: path.join(rootDir, '.env') });
 
 export const config = {
   port: parseInt(process.env.PORT || '8000', 10),
@@ -30,7 +30,8 @@ export const config = {
   },
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
   email: {
-    from: process.env.EMAIL_FROM || 'Terralogic ASP <noreply@example.com>',
+    from: process.env.EMAIL_FROM || 'Academy ASP <noreply@example.com>',
+    teacherNotify: process.env.TEACHER_NOTIFY_EMAIL || '',
     smtp: {
       host: process.env.SMTP_HOST || 'smtp-relay.brevo.com',
       port: parseInt(process.env.SMTP_PORT || '587', 10),

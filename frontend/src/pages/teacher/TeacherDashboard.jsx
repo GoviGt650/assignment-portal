@@ -1,25 +1,18 @@
-import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BookOpen, ClipboardList, Upload, Users } from 'lucide-react';
 import PageHeader from '../../components/PageHeader';
 import { dashboardApi } from '../../services/api';
 import { formatDate } from '../../utils/helpers';
-import { LoadingPage, Panel, StatCard, StatusBadge } from '../../components/UI';
+import { useAsyncLoad } from '../../hooks/useAsyncLoad.jsx';
+import { Panel, StatCard, StatusBadge } from '../../components/UI';
 
 export default function TeacherDashboard() {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { renderState } = useAsyncLoad(
+    () => dashboardApi.teacher().then(({ data }) => data),
+    []
+  );
 
-  useEffect(() => {
-    dashboardApi.teacher()
-      .then(({ data: d }) => setData(d))
-      .finally(() => setLoading(false));
-  }, []);
-
-  if (loading) return <LoadingPage />;
-  if (!data) return null;
-
-  return (
+  return renderState((data) => (
     <div className="space-y-6">
       <PageHeader
         badge="Teacher Portal"
@@ -63,40 +56,30 @@ export default function TeacherDashboard() {
                   <p className="font-medium text-slate-900">{s.username}</p>
                   <p className="text-sm text-slate-500">{s.assignment_title}</p>
                 </div>
-                <StatusBadge status={s.status} />
+                <div className="text-right">
+                  <StatusBadge status={s.status} />
+                  <p className="mt-1 text-xs text-slate-400">{formatDate(s.submitted_at)}</p>
+                </div>
               </Link>
             ))}
-            {data.recent_submissions.length === 0 && (
-              <p className="text-sm text-slate-500">No submissions yet.</p>
-            )}
           </div>
         </Panel>
 
-        <Panel
-          title="Upcoming Deadlines"
-          action={
-            <Link to="/teacher/assignments" className="text-sm font-semibold text-brand-600 hover:underline">
-              Manage
-            </Link>
-          }
-        >
+        <Panel title="Upcoming Deadlines">
           <div className="space-y-3">
-            {data.upcoming_assignments.map((a) => (
+            {(data.upcoming_assignments || []).map((a) => (
               <Link
                 key={a.id}
-                to={`/teacher/submissions?assignment_id=${a.id}&status=awaiting`}
-                className="block rounded-xl border border-slate-100 bg-slate-50/80 px-4 py-3 transition hover:-translate-y-0.5 hover:border-brand-100 hover:bg-white hover:shadow-sm"
+                to={`/teacher/assignments`}
+                className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/80 px-4 py-3 transition hover:border-brand-100 hover:bg-white"
               >
                 <p className="font-medium text-slate-900">{a.title}</p>
-                <p className="text-sm text-slate-500">Due {formatDate(a.deadline)}</p>
+                <p className="text-sm text-slate-500">{formatDate(a.deadline)}</p>
               </Link>
             ))}
-            {data.upcoming_assignments.length === 0 && (
-              <p className="text-sm text-slate-500">No upcoming assignments.</p>
-            )}
           </div>
         </Panel>
       </div>
     </div>
-  );
+  ));
 }

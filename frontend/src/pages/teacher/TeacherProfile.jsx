@@ -3,10 +3,13 @@ import {
   Calendar,
   ChevronRight,
   KeyRound,
+  Mail,
   Shield,
   User,
 } from 'lucide-react';
 import PageHeader from '../../components/PageHeader';
+import OtpInput, { PasswordStrength } from '../../components/OtpInput';
+import OtpResendControl, { DevOtpNotice } from '../../components/OtpResendControl';
 import { authApi } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { formatDate } from '../../utils/helpers';
@@ -16,8 +19,8 @@ const inputClass =
   'w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10';
 
 const sections = [
-  { id: 'profile', label: 'Profile', icon: User, description: 'Account details and identity' },
-  { id: 'security', label: 'Security', icon: Shield, description: 'Password and sign-in' },
+  { id: 'profile', label: 'Profile', icon: User, description: 'Email, username, and identity' },
+  { id: 'security', label: 'Security', icon: Shield, description: 'Password with email verification' },
 ];
 
 function roleLabel(role) {
@@ -86,12 +89,12 @@ function ProfileHero({ user }) {
             </div>
             <div className="pb-1">
               <h2 className="text-xl font-bold text-slate-900">{user.username}</h2>
-              <p className="mt-1 text-sm text-slate-500">Terralogic ASP · {roleLabel(user.role)}</p>
+              <p className="mt-1 text-sm text-slate-500">Academy ASP · {roleLabel(user.role)}</p>
             </div>
           </div>
           <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            Active
+            {user.email ? 'Email verified' : 'Active'}
           </span>
         </div>
 
@@ -115,38 +118,128 @@ function ProfileHero({ user }) {
   );
 }
 
+function useCooldown() {
+  const [cooldown, setCooldown] = useState(0);
+  useEffect(() => {
+    if (cooldown <= 0) return undefined;
+    const timer = setTimeout(() => setCooldown((value) => value - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [cooldown]);
+  return [cooldown, setCooldown];
+}
+
 export default function TeacherProfile() {
   const { user, updateSession } = useAuth();
   const [activeSection, setActiveSection] = useState('profile');
   const [notice, setNotice] = useState(null);
 
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [emailOtp, setEmailOtp] = useState('');
+  const [emailOtpSent, setEmailOtpSent] = useState(false);
+  const [emailDevMode, setEmailDevMode] = useState(false);
+  const [loadingEmail, setLoadingEmail] = useState(false);
+  const [sendingEmailOtp, setSendingEmailOtp] = useState(false);
+  const [emailCooldown, setEmailCooldown] = useCooldown();
+
   const [editingUsername, setEditingUsername] = useState(false);
-  const [editingPassword, setEditingPassword] = useState(false);
-  const [loadingProfile, setLoadingProfile] = useState(false);
-  const [loadingPassword, setLoadingPassword] = useState(false);
-
-  const [currentPasswordProfile, setCurrentPasswordProfile] = useState('');
   const [newUsername, setNewUsername] = useState('');
+  const [usernameOtp, setUsernameOtp] = useState('');
+  const [usernameOtpSent, setUsernameOtpSent] = useState(false);
+  const [usernameDevMode, setUsernameDevMode] = useState(false);
+  const [loadingUsername, setLoadingUsername] = useState(false);
+  const [sendingUsernameOtp, setSendingUsernameOtp] = useState(false);
+  const [usernameCooldown, setUsernameCooldown] = useCooldown();
 
-  const [currentPasswordSecurity, setCurrentPasswordSecurity] = useState('');
+  const [editingPassword, setEditingPassword] = useState(false);
+  const [passwordOtp, setPasswordOtp] = useState('');
+  const [passwordOtpSent, setPasswordOtpSent] = useState(false);
+  const [passwordDevMode, setPasswordDevMode] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [loadingPassword, setLoadingPassword] = useState(false);
+  const [sendingPasswordOtp, setSendingPasswordOtp] = useState(false);
+  const [passwordCooldown, setPasswordCooldown] = useCooldown();
 
   useEffect(() => {
     setNewUsername(user?.username || '');
   }, [user?.username]);
 
-  const resetProfileEdit = () => {
+  const resetEmailEdit = () => {
+    setEditingEmail(false);
+    setNewEmail('');
+    setEmailOtp('');
+    setEmailOtpSent(false);
+  };
+
+  const resetUsernameEdit = () => {
     setEditingUsername(false);
-    setCurrentPasswordProfile('');
     setNewUsername(user?.username || '');
+    setUsernameOtp('');
+    setUsernameOtpSent(false);
   };
 
   const resetPasswordEdit = () => {
     setEditingPassword(false);
-    setCurrentPasswordSecurity('');
+    setPasswordOtp('');
+    setPasswordOtpSent(false);
     setNewPassword('');
     setConfirmPassword('');
+  };
+
+  const handleSendEmailOtp = async () => {
+    if (!newEmail.trim()) {
+      setNotice({ type: 'error', title: 'Email required', message: 'Enter your new email address first.' });
+      return;
+    }
+    setSendingEmailOtp(true);
+    setNotice(null);
+    try {
+      const { data } = await authApi.sendChangeEmailOtp(newEmail.trim());
+      setEmailOtpSent(true);
+      setEmailDevMode(Boolean(data.dev_mode));
+      setEmailCooldown(60);
+      setNotice({ type: 'success', title: 'Code sent', message: data.message });
+    } catch (err) {
+      setNotice({ type: 'error', title: 'Could not send code', message: err.message });
+    } finally {
+      setSendingEmailOtp(false);
+    }
+  };
+
+  const handleEmailSave = async () => {
+    setNotice(null);
+    if (!emailOtpSent || emailOtp.length !== 6) {
+      setNotice({ type: 'error', title: 'Verification required', message: 'Send and enter the 6-digit code from your new email.' });
+      return;
+    }
+    setLoadingEmail(true);
+    try {
+      const { data } = await authApi.updateEmail({ new_email: newEmail.trim(), otp: emailOtp });
+      updateSession(data.access_token, data.user);
+      resetEmailEdit();
+      setNotice({ type: 'success', title: 'Email updated', message: data.message });
+    } catch (err) {
+      setNotice({ type: 'error', title: 'Could not update email', message: err.message });
+    } finally {
+      setLoadingEmail(false);
+    }
+  };
+
+  const handleSendUsernameOtp = async () => {
+    setSendingUsernameOtp(true);
+    setNotice(null);
+    try {
+      const { data } = await authApi.sendChangeUsernameOtp();
+      setUsernameOtpSent(true);
+      setUsernameDevMode(Boolean(data.dev_mode));
+      setUsernameCooldown(60);
+      setNotice({ type: 'success', title: 'Code sent', message: data.message });
+    } catch (err) {
+      setNotice({ type: 'error', title: 'Could not send code', message: err.message });
+    } finally {
+      setSendingUsernameOtp(false);
+    }
   };
 
   const handleUsernameSave = async () => {
@@ -155,59 +248,67 @@ export default function TeacherProfile() {
 
     if (!usernameChanged) {
       setNotice({ type: 'info', title: 'No changes', message: 'Your username is already set to this value.' });
-      resetProfileEdit();
+      resetUsernameEdit();
       return;
     }
 
-    if (!currentPasswordProfile) {
-      setNotice({ type: 'error', title: 'Password required', message: 'Enter your current password to update your username.' });
+    if (!usernameOtpSent || usernameOtp.length !== 6) {
+      setNotice({ type: 'error', title: 'Verification required', message: 'Send and enter the code sent to your registered email.' });
       return;
     }
 
-    setLoadingProfile(true);
+    setLoadingUsername(true);
     try {
-      const { data } = await authApi.updateProfile({
-        current_password: currentPasswordProfile,
+      const { data } = await authApi.updateUsernameWithOtp({
         new_username: newUsername.trim(),
+        otp: usernameOtp,
       });
       updateSession(data.access_token, data.user);
-      resetProfileEdit();
-      setNotice({ type: 'success', title: 'Username updated', message: 'Your teacher username has been saved.' });
+      resetUsernameEdit();
+      setNotice({ type: 'success', title: 'Username updated', message: data.message });
     } catch (err) {
       setNotice({ type: 'error', title: 'Could not update username', message: err.message });
     } finally {
-      setLoadingProfile(false);
+      setLoadingUsername(false);
+    }
+  };
+
+  const handleSendPasswordOtp = async () => {
+    setSendingPasswordOtp(true);
+    setNotice(null);
+    try {
+      const { data } = await authApi.sendChangePasswordOtp();
+      setPasswordOtpSent(true);
+      setPasswordDevMode(Boolean(data.dev_mode));
+      setPasswordCooldown(60);
+      setNotice({ type: 'success', title: 'Code sent', message: data.message });
+    } catch (err) {
+      setNotice({ type: 'error', title: 'Could not send code', message: err.message });
+    } finally {
+      setSendingPasswordOtp(false);
     }
   };
 
   const handlePasswordSave = async () => {
     setNotice(null);
-
-    if (!newPassword || !confirmPassword) {
-      setNotice({ type: 'error', title: 'Missing fields', message: 'Enter and confirm your new password.' });
+    if (!passwordOtpSent || passwordOtp.length !== 6) {
+      setNotice({ type: 'error', title: 'Verification required', message: 'Send and enter the code sent to your registered email.' });
       return;
     }
-
     if (newPassword !== confirmPassword) {
       setNotice({ type: 'error', title: 'Passwords do not match', message: 'Make sure both password fields are identical.' });
       return;
     }
-
-    if (!currentPasswordSecurity) {
-      setNotice({ type: 'error', title: 'Password required', message: 'Enter your current password to set a new one.' });
-      return;
-    }
-
     setLoadingPassword(true);
     try {
-      const { data } = await authApi.updateProfile({
-        current_password: currentPasswordSecurity,
+      const { data } = await authApi.updatePasswordWithOtp({
+        otp: passwordOtp,
         new_password: newPassword,
         confirm_password: confirmPassword,
       });
       updateSession(data.access_token, data.user);
       resetPasswordEdit();
-      setNotice({ type: 'success', title: 'Password updated', message: 'Your password was changed successfully. You remain signed in.' });
+      setNotice({ type: 'success', title: 'Password updated', message: data.message });
     } catch (err) {
       setNotice({ type: 'error', title: 'Could not update password', message: err.message });
     } finally {
@@ -222,7 +323,7 @@ export default function TeacherProfile() {
       <PageHeader
         badge="Settings"
         title="Account Settings"
-        subtitle="Manage your teacher profile, credentials, and account security."
+        subtitle="Manage your email, username, password, and account security."
       />
 
       {notice && (
@@ -247,13 +348,79 @@ export default function TeacherProfile() {
               <div className="mb-6 border-b border-slate-100 pb-6">
                 <h3 className="text-lg font-semibold text-slate-900">Profile</h3>
                 <p className="mt-1 text-sm text-slate-500">
-                  Update how your account appears in the portal.
+                  Your verified email is used for security codes, recovery, and submission alerts.
                 </p>
               </div>
 
               <SettingsRow
+                label="Email address"
+                description="We send a verification code to your new email before updating."
+              >
+                {!editingEmail ? (
+                  <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Mail size={16} className="shrink-0 text-brand-600" />
+                      <span className="truncate font-medium text-slate-900">{user.email || 'Not set'}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEditingEmail(true)}
+                      className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-brand-600 hover:text-brand-700"
+                    >
+                      Change
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+                    <input
+                      type="email"
+                      value={newEmail}
+                      onChange={(e) => {
+                        setNewEmail(e.target.value);
+                        setEmailOtpSent(false);
+                        setEmailDevMode(false);
+                        setEmailOtp('');
+                      }}
+                      className={inputClass}
+                      placeholder="New email address"
+                    />
+                    <DevOtpNotice visible={emailDevMode} />
+                    <OtpResendControl
+                      onSend={handleSendEmailOtp}
+                      sending={sendingEmailOtp}
+                      sent={emailOtpSent}
+                      cooldown={emailCooldown}
+                      disabled={!newEmail.trim()}
+                    />
+                    <div>
+                      <p className="mb-2 text-xs font-medium text-slate-600">Enter 6-digit code</p>
+                      <OtpInput value={emailOtp} onChange={setEmailOtp} disabled={!emailOtpSent} />
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={handleEmailSave}
+                        disabled={loadingEmail}
+                        className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+                      >
+                        {loadingEmail ? 'Saving...' : 'Save email'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={resetEmailEdit}
+                        className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-white"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </SettingsRow>
+
+              <SettingsRow
                 label="Username"
-                description="Used to sign in and shown on submissions you review."
+                description="We email a one-time code to your registered address before changing your sign-in name."
               >
                 {!editingUsername ? (
                   <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3">
@@ -268,34 +435,45 @@ export default function TeacherProfile() {
                     </button>
                   </div>
                 ) : (
-                  <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+                  <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50/80 p-4">
                     <input
                       type="text"
                       value={newUsername}
-                      onChange={(e) => setNewUsername(e.target.value)}
+                      onChange={(e) => {
+                        setNewUsername(e.target.value);
+                        setUsernameOtpSent(false);
+                        setUsernameDevMode(false);
+                        setUsernameOtp('');
+                      }}
                       minLength={3}
                       className={inputClass}
                       placeholder="New username"
                     />
-                    <input
-                      type="password"
-                      value={currentPasswordProfile}
-                      onChange={(e) => setCurrentPasswordProfile(e.target.value)}
-                      className={inputClass}
-                      placeholder="Current password to confirm"
+                    <DevOtpNotice visible={usernameDevMode} />
+                    <OtpResendControl
+                      onSend={handleSendUsernameOtp}
+                      sending={sendingUsernameOtp}
+                      sent={usernameOtpSent}
+                      cooldown={usernameCooldown}
+                      idleLabel="Send code to my email"
+                      sentLabel="Resend code to email"
                     />
+                    <div>
+                      <p className="mb-2 text-xs font-medium text-slate-600">Verification code</p>
+                      <OtpInput value={usernameOtp} onChange={setUsernameOtp} disabled={!usernameOtpSent} />
+                    </div>
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
                         onClick={handleUsernameSave}
-                        disabled={loadingProfile}
+                        disabled={loadingUsername}
                         className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
                       >
-                        {loadingProfile ? 'Saving...' : 'Save username'}
+                        {loadingUsername ? 'Saving...' : 'Save username'}
                       </button>
                       <button
                         type="button"
-                        onClick={resetProfileEdit}
+                        onClick={resetUsernameEdit}
                         className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-white"
                       >
                         Cancel
@@ -323,13 +501,13 @@ export default function TeacherProfile() {
               <div className="mb-6 border-b border-slate-100 pb-6">
                 <h3 className="text-lg font-semibold text-slate-900">Security</h3>
                 <p className="mt-1 text-sm text-slate-500">
-                  Keep your account secure with a strong, unique password.
+                  Change your password using a verification code sent to your registered email.
                 </p>
               </div>
 
               <SettingsRow
                 label="Password"
-                description="Use at least 6 characters. You will stay signed in after updating."
+                description="We email a one-time code to confirm it is really you."
               >
                 {!editingPassword ? (
                   <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3">
@@ -347,14 +525,20 @@ export default function TeacherProfile() {
                     </button>
                   </div>
                 ) : (
-                  <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/80 p-4">
-                    <input
-                      type="password"
-                      value={currentPasswordSecurity}
-                      onChange={(e) => setCurrentPasswordSecurity(e.target.value)}
-                      className={inputClass}
-                      placeholder="Current password"
+                  <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+                    <DevOtpNotice visible={passwordDevMode} />
+                    <OtpResendControl
+                      onSend={handleSendPasswordOtp}
+                      sending={sendingPasswordOtp}
+                      sent={passwordOtpSent}
+                      cooldown={passwordCooldown}
+                      idleLabel="Send code to my email"
+                      sentLabel="Resend code to email"
                     />
+                    <div>
+                      <p className="mb-2 text-xs font-medium text-slate-600">Verification code</p>
+                      <OtpInput value={passwordOtp} onChange={setPasswordOtp} disabled={!passwordOtpSent} />
+                    </div>
                     <input
                       type="password"
                       value={newPassword}
@@ -363,6 +547,7 @@ export default function TeacherProfile() {
                       className={inputClass}
                       placeholder="New password"
                     />
+                    <PasswordStrength password={newPassword} />
                     <input
                       type="password"
                       value={confirmPassword}
@@ -392,13 +577,15 @@ export default function TeacherProfile() {
               </SettingsRow>
 
               <SettingsRow
-                label="Session"
-                description="You are currently signed in on this device."
+                label="Forgot password"
+                description="If you are signed out, use Forgot password on the login page with your username or email."
                 last
               >
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3">
-                  <p className="text-sm font-medium text-emerald-900">Signed in as {user.username}</p>
-                  <p className="mt-1 text-xs text-emerald-700">Your session stays active after profile updates.</p>
+                <div className="rounded-xl border border-brand-100 bg-brand-50/60 px-4 py-3">
+                  <p className="text-sm font-medium text-brand-900">Recovery enabled</p>
+                  <p className="mt-1 text-xs text-brand-700">
+                    Codes are sent to {user.email || 'your registered email'}.
+                  </p>
                 </div>
               </SettingsRow>
             </div>

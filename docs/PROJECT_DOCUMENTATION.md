@@ -1,4 +1,4 @@
-# Terralogic Assignment Portal — Project Documentation
+# Academy Assignment Portal — Project Documentation
 
 > **Purpose of this document:** A complete study guide for understanding how this full-stack project is built, how the frontend and backend connect, how API calls work, and how data flows through the system.
 
@@ -33,7 +33,7 @@
 Assignments were shared on WhatsApp as PDFs. Students downloaded files, pushed code to Git, and submitted manually. Teachers had no central way to track submissions.
 
 ### Solution
-**Terralogic Assignment Portal (ASP)** is a web application with two roles:
+**Academy Assignment Portal (ASP)** is a web application with two roles:
 
 | Role | Can Do |
 |------|--------|
@@ -323,7 +323,8 @@ main.jsx
 | `/teacher/upload` | Teacher | Upload form |
 | `/teacher/submissions` | Teacher | Review submissions |
 | `/teacher/students` | Teacher | Student list |
-| `/teacher/profile` | Teacher | Change username/password |
+| `/teacher/profile` | Teacher | Account settings (email, username, password via OTP) |
+| `/teacher/setup-email` | Teacher | First-time email setup (required if no email on account) |
 
 ### Protected routes (`components/ProtectedRoute.jsx`)
 
@@ -580,10 +581,22 @@ Authorization: Bearer <your_jwt_token>
 
 | Method | Endpoint | Auth | Role | Description |
 |--------|----------|------|------|-------------|
-| POST | `/register` | No | — | Student registration |
+| POST | `/otp/send/register` | No | — | Send registration OTP |
+| POST | `/register` | No | — | Student registration (email + OTP) |
 | POST | `/login` | No | — | Login (teacher or student) |
 | GET | `/me` | Yes | Any | Get current user profile |
-| PATCH | `/profile` | Yes | Teacher | Change username/password |
+| POST | `/otp/send/setup-email` | Yes | Teacher | Send OTP to new email (first-time setup) |
+| PATCH | `/account/setup-email` | Yes | Teacher | Add email: `{ email, otp, current_password }` |
+| POST | `/otp/send/change-email` | Yes | Student, Teacher | OTP to new email |
+| POST | `/otp/send/change-password` | Yes | Student, Teacher | OTP to registered email |
+| POST | `/otp/send/change-username` | Yes | Teacher | OTP to registered email |
+| PATCH | `/account/email` | Yes | Student, Teacher | Update email with OTP |
+| PATCH | `/account/password` | Yes | Student, Teacher | Update password with OTP |
+| PATCH | `/account/username` | Yes | Teacher | Update username with OTP |
+| POST | `/forgot-password/lookup` | No | — | Lookup by email or username (masked email if found) |
+| POST | `/otp/send/forgot-password` | No | — | Send reset OTP (any user with registered email) |
+| POST | `/reset-password` | No | — | Reset password with OTP |
+| PATCH | `/profile` | Yes | Teacher | Legacy username/password change with current password |
 | GET | `/students` | Yes | Teacher | List/search students |
 
 **POST /login — Request:**
@@ -979,13 +992,19 @@ Downloads use human-readable names instead of server-generated UUID filenames:
 | Feature | Frontend File | Backend File |
 |---------|--------------|--------------|
 | Login | `pages/LoginPage.jsx` | `routers/auth.js` |
-| Register | `pages/RegisterPage.jsx` | `routers/auth.js` |
+| Register (3-step) | `pages/RegisterPage.jsx` | `routers/auth.js` |
+| Forgot password (3-step) | `pages/ForgotPasswordPage.jsx` | `routers/auth.js` |
+| Teacher email setup | `pages/teacher/TeacherSetupEmail.jsx` | `routers/auth.js` (setup-email) |
+| Teacher email gate | `layouts/TeacherLayout.jsx` | redirects to `/teacher/setup-email` if no email |
+| Teacher account settings | `pages/teacher/TeacherProfile.jsx` | OTP routes + `/account/*` |
+| Student account settings | `pages/student/StudentProfile.jsx` | OTP routes + `/account/*` |
+| Step progress UI | `components/AuthStepIndicator.jsx` | used on register, forgot password, teacher setup |
 | Teacher dashboard | `pages/teacher/TeacherDashboard.jsx` | `routers/dashboard.js` |
 | Upload assignment | `pages/teacher/UploadAssignment.jsx` | `routers/assignments.js` |
 | Submit work | `pages/student/SubmitAssignment.jsx` | `routers/submissions.js` |
 | Teacher feedback | `pages/teacher/SubmissionList.jsx` | `routers/submissions.js` (PATCH /feedback) |
 | File preview | `components/UI.jsx` (FilePreviewModal) | `routers/files.js` + storage services |
-| Change password | `pages/teacher/TeacherProfile.jsx` | `routers/auth.js` (PATCH /profile) |
+| Change password | `pages/teacher/TeacherProfile.jsx` | `routers/auth.js` (PATCH /account/password) |
 | Download/preview PDF | `pages/student/AssignmentDetail.jsx` | `routers/files.js` |
 | Shared UI | `components/UI.jsx` | — |
 | Helpers (dates, names) | `utils/helpers.js` | — |
@@ -994,4 +1013,111 @@ Downloads use human-readable names instead of server-generated UUID filenames:
 
 ---
 
-*Documentation version: 1.1 — Terralogic Assignment Portal*
+## 19. Email OTP, Notifications & Collaboration (v1.3)
+
+### Email OTP (Brevo SMTP)
+
+Students verify email during registration. Teachers add a recovery email on first login. OTP codes expire in **10 minutes** with a **60s resend cooldown**.
+
+| Purpose | Endpoint | Who |
+|---------|----------|-----|
+| Registration | `POST /api/auth/otp/send/register` | Public |
+| Teacher setup email | `POST /api/auth/otp/send/setup-email` | Teacher (no email yet) |
+| Teacher add email | `PATCH /api/auth/account/setup-email` | Teacher (`email`, `otp`, `current_password`) |
+| Forgot password | `POST /api/auth/otp/send/forgot-password` | Public (email or username) |
+| Change email | `POST /api/auth/otp/send/change-email` | Student or teacher (logged in) |
+| Change password | `POST /api/auth/otp/send/change-password` | Student or teacher (logged in) |
+| Change username | `POST /api/auth/otp/send/change-username` | Teacher (logged in, has email) |
+
+**Dev fallback:** If `SMTP_USER` / `SMTP_PASS` are missing, codes print as `[DEV OTP]` in the backend terminal. API responses include `dev_mode: true`. When SMTP is configured, `dev_mode` is false and no terminal banner is shown in the UI.
+
+**Brevo sender:** `EMAIL_FROM` must **exactly match** a verified sender in Brevo → Senders & IP → Senders. Example: if Brevo shows `govindjadapalli92@gmail.com`, do not use `govind.jadapalli92@gmail.com` (Gmail treats dots as equivalent; Brevo does not).
+
+**Setup:** Run `npm run setup:env` in `backend/` or copy `.env.example` → `.env`.
+
+### Teacher first-time email setup
+
+1. Teacher logs in with seeded credentials (`teacher` / `teacher123`)
+2. `TeacherLayout` redirects to `/teacher/setup-email` until `users.email` is set
+3. **Step 1:** Enter and confirm recovery email → OTP sent
+4. **Step 2:** Enter 6-digit code
+5. **Step 3:** Confirm with current password → `PATCH /account/setup-email`
+6. Dashboard unlocks; submission notifications can use this email
+
+### Teacher account settings (after email is set)
+
+| Action | Verification |
+|--------|----------------|
+| Change email | OTP to **new** email |
+| Change username | OTP to **registered** email |
+| Change password | OTP to **registered** email |
+
+Route: `/teacher/profile`
+
+### Student registration & forgot password (multi-step UI)
+
+Both flows use `AuthStepIndicator` (progress bar + mobile-friendly step labels):
+
+| Flow | Steps |
+|------|--------|
+| Register | Email → Verify code → Username + password |
+| Forgot password | Find account (email or username) → Verify code → New password |
+
+Forgot password works for **students and teachers** who have a registered email.
+
+### Forgot password flow
+
+1. User opens `/forgot-password`
+2. Enters registered **email** or **username** → masked email shown if found
+3. `POST /api/auth/otp/send/forgot-password` → OTP sent
+4. `POST /api/auth/reset-password` with email or username, OTP, new password
+
+### Teacher submission notifications
+
+When a student submits or updates work, the API emails the teacher if configured:
+
+```env
+TEACHER_NOTIFY_EMAIL=teacher@gmail.com
+```
+
+Without this, the app uses the first teacher user with an email in the database (after setup). In dev mode without SMTP, notifications log as `[DEV NOTIFY]`.
+
+### Health check
+
+`GET /api/health` returns:
+
+```json
+{
+  "status": "ok",
+  "email": { "configured": true, "mode": "smtp" }
+}
+```
+
+`mode` is `smtp` or `dev-fallback` (no secrets exposed). On startup the backend logs the configured `EMAIL_FROM` sender.
+
+### Git branch workflow
+
+| Branch | Use |
+|--------|-----|
+| `development` | Daily work — **push here** |
+| `staging` | Integration testing |
+| `main` | Production releases |
+
+See [CONTRIBUTING.md](../CONTRIBUTING.md). Do not commit `.env`, `data/`, or `*.db`.
+
+### New frontend components
+
+| Component | Purpose |
+|-----------|---------|
+| `AuthStepIndicator.jsx` | Multi-step auth progress (register, forgot password, teacher setup) |
+| `OtpResendControl.jsx` | Resend button with countdown progress bar |
+| `DevOtpNotice.jsx` | Banner when SMTP not configured |
+| `ApiErrorState.jsx` | Mobile-friendly API error + retry |
+| `useAsyncLoad.jsx` | Dashboard fetch with error handling |
+| `ForgotPasswordPage.jsx` | Password reset (students + teachers) |
+| `TeacherSetupEmail.jsx` | Teacher first-time email setup |
+| `TeacherLayout.jsx` | Email-setup gate for teacher routes |
+
+---
+
+*Documentation version: 1.3 — Academy Assignment Portal*

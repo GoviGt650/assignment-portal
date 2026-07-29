@@ -20,21 +20,36 @@ api.interceptors.response.use(
   (error) => {
     if (!error.response) {
       return Promise.reject(new Error(
-        'Cannot reach the API server. Start the backend: cd backend && npm run dev'
+        'Cannot reach the API server. On mobile, use the same WiFi as the dev PC and start the backend: cd backend && npm run dev'
       ));
+    }
+    const status = error.response.status;
+    if (status === 502 || status === 503 || status === 504) {
+      return Promise.reject(new Error('Server is starting up. Wait a moment and try again.'));
     }
     const message = error.response?.data?.detail || error.message || 'Something went wrong';
     return Promise.reject(new Error(message));
   }
 );
 
+export const healthApi = {
+  check: () => api.get('/health'),
+};
+
 export const authApi = {
   login: (data) => api.post('/auth/login', data),
   register: (data) => api.post('/auth/register', data),
   sendRegisterOtp: (email) => api.post('/auth/otp/send/register', { email }),
+  sendForgotPasswordOtp: (data) => api.post('/auth/otp/send/forgot-password', data),
+  lookupForgotPassword: (data) => api.post('/auth/forgot-password/lookup', data),
+  resetPassword: (data) => api.post('/auth/reset-password', data),
   sendChangeEmailOtp: (email) => api.post('/auth/otp/send/change-email', { email }),
   sendChangePasswordOtp: () => api.post('/auth/otp/send/change-password'),
+  sendSetupEmailOtp: (email) => api.post('/auth/otp/send/setup-email', { email }),
+  sendChangeUsernameOtp: () => api.post('/auth/otp/send/change-username'),
+  setupEmail: (data) => api.patch('/auth/account/setup-email', data),
   updateEmail: (data) => api.patch('/auth/account/email', data),
+  updateUsernameWithOtp: (data) => api.patch('/auth/account/username', data),
   updatePasswordWithOtp: (data) => api.patch('/auth/account/password', data),
   me: () => api.get('/auth/me'),
   updateProfile: (data) => api.patch('/auth/profile', data),

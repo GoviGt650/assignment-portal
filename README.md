@@ -1,11 +1,14 @@
-# Terralogic Assignment Portal
+# Academy Assignment Portal
 
 A centralized **Assignment Submission Portal (ASP)** for teachers and students. Replace WhatsApp PDF sharing and manual Git tracking with a single web app for publishing assignments, submitting work, and tracking submissions.
 
 ## Features
 
 ### Teacher
-- Secure login and professional account settings (username/password)
+- Secure login and professional account settings
+- **First-time email setup** — after login, add a recovery email (OTP + current password) before using the portal
+- **Account settings** — change email, username, or password with **email OTP** verification
+- **Forgot password** — works for teachers once a recovery email is set (username or email lookup)
 - Create assignments with PDF, description, and **date-only deadline**
 - Card-based assignment management with submission counts
 - Compact submissions table with **assignment filter**, search, and status filters
@@ -17,8 +20,9 @@ A centralized **Assignment Submission Portal (ASP)** for teachers and students. 
 - Search students by username
 
 ### Student
-- Register with **email verification (OTP)**, username, and password
+- Register with **email verification (OTP)** — multi-step flow (email → code → account details)
 - **Account settings** — change email or password with OTP confirmation
+- **Forgot password** — multi-step reset (find account → verify code → new password)
 - Dashboard and **card-based** assignment list with status filters
 - **Preview** assignment PDF in browser before downloading
 - Download assignment PDFs with clean filenames (assignment title)
@@ -88,6 +92,10 @@ Default teacher login:
 - **Username:** `teacher`
 - **Password:** `teacher123`
 
+On first login, teachers are guided through **one-time email setup** (`/teacher/setup-email`) before accessing the dashboard.
+
+Interactive env setup: `npm run setup:env` in `backend/` (SMTP / Brevo).
+
 ### 3. Frontend
 
 ```bash
@@ -117,7 +125,8 @@ App runs at **http://localhost:5173**
 | `SMTP_PORT` | SMTP port (default `587`) |
 | `SMTP_USER` | Brevo **SMTP login** from dashboard (format `xxx@smtp-brevo.com`) — not your Gmail |
 | `SMTP_PASS` | Brevo SMTP key (from SMTP & API in dashboard) |
-| `EMAIL_FROM` | Verified sender, e.g. `Terralogic ASP <your-email@gmail.com>` |
+| `EMAIL_FROM` | Verified Brevo sender — must **exactly match** a verified sender in Brevo (e.g. `Academy ASP <you@gmail.com>`). Gmail ignores dots; Brevo does not. |
+| `TEACHER_NOTIFY_EMAIL` | Optional — email for submission alerts (defaults to teacher’s account email once set) |
 
 ### Frontend (`frontend/.env`)
 
@@ -131,6 +140,15 @@ App runs at **http://localhost:5173**
 |--------|----------|-------------|
 | POST | `/api/auth/otp/send/register` | Send registration OTP to email |
 | POST | `/api/auth/register` | Student registration (email + OTP) |
+| POST | `/api/auth/otp/send/setup-email` | Teacher first-time email setup OTP |
+| PATCH | `/api/auth/account/setup-email` | Teacher add email (OTP + current password) |
+| POST | `/api/auth/otp/send/change-username` | Teacher username change OTP |
+| PATCH | `/api/auth/account/username` | Teacher update username with OTP |
+| POST | `/api/auth/otp/send/change-email` | Change email OTP (student or teacher) |
+| POST | `/api/auth/otp/send/change-password` | Change password OTP (student or teacher) |
+| POST | `/api/auth/forgot-password/lookup` | Lookup account for password reset |
+| POST | `/api/auth/otp/send/forgot-password` | Send reset OTP (students and teachers with email) |
+| POST | `/api/auth/reset-password` | Reset password with OTP |
 | POST | `/api/auth/login` | Login |
 | GET | `/api/auth/me` | Current user |
 | GET | `/api/assignments` | List assignments |
@@ -168,6 +186,8 @@ Production uses **Supabase Storage** (`STORAGE_TYPE=supabase`). See [docs/FREE_D
 
 ## Security Notes
 - Change `JWT_SECRET` and teacher password in production
+- Teachers should complete **email setup** and change default credentials
+- Verify `EMAIL_FROM` in Brevo before sending OTP in production
 - Use HTTPS in production
 - File uploads are validated by extension and MIME type
 - Students cannot view other students' submissions

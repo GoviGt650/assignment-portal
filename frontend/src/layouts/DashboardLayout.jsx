@@ -102,7 +102,7 @@ export default function DashboardLayout() {
               <BookOpen size={20} />
             </div>
             <div>
-              <p className="font-bold text-white">Terralogic ASP</p>
+              <p className="font-bold text-white">Academy ASP</p>
               <p className="text-xs text-slate-300">{roleLabel}</p>
             </div>
           </div>
@@ -152,7 +152,7 @@ export default function DashboardLayout() {
               <BookOpen size={18} />
             </div>
             <div>
-              <p className="text-sm font-bold text-white">Terralogic ASP</p>
+              <p className="text-sm font-bold text-white">Academy ASP</p>
               <p className="text-xs text-slate-400">{roleLabel}</p>
             </div>
           </div>
