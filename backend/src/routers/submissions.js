@@ -78,7 +78,7 @@ router.get('/', authenticate, async (req, res, next) => {
            CASE
              WHEN s.id IS NULL THEN
                CASE WHEN a.deadline < NOW() THEN 'overdue' ELSE 'not_submitted' END
-             ELSE s.status
+             ELSE s.status::text
            END AS status
          FROM users u
          JOIN assignments a ON a.id = $1
@@ -385,7 +385,7 @@ router.patch(
         `UPDATE submissions
          SET remarks = $1,
              status = CASE
-               WHEN $2 IS NOT NULL AND status IN ('submitted', 'late') THEN 'reviewed'
+               WHEN $2::text IS NOT NULL AND status IN ('submitted', 'late') THEN 'reviewed'::submission_status
                ELSE status
              END
          WHERE id = $3 RETURNING *`,

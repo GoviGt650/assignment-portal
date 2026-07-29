@@ -11,6 +11,9 @@ const BUCKETS = {
   submission: 'submissions',
 };
 
+/** Supabase free tier global file size limit (MB). Pro plans allow higher. */
+const SUPABASE_MAX_FILE_SIZE_MB = 50;
+
 function buildPublicUrl(type, filename) {
   return `/api/files/${BUCKETS[type]}/${filename}`;
 }
@@ -37,11 +40,18 @@ export async function initStorage() {
   const { data: buckets } = await client.storage.listBuckets();
   const existing = new Set((buckets || []).map((b) => b.name));
 
+  const bucketLimitMb = Math.min(config.storage.maxFileSizeMb, SUPABASE_MAX_FILE_SIZE_MB);
+  if (config.storage.maxFileSizeMb > SUPABASE_MAX_FILE_SIZE_MB) {
+    console.warn(
+      `[storage] MAX_FILE_SIZE_MB=${config.storage.maxFileSizeMb} exceeds Supabase limit (${SUPABASE_MAX_FILE_SIZE_MB} MB on free tier). Buckets use ${bucketLimitMb} MB.`
+    );
+  }
+
   for (const bucket of Object.values(BUCKETS)) {
     if (existing.has(bucket)) continue;
     const { error } = await client.storage.createBucket(bucket, {
       public: false,
-      fileSizeLimit: config.storage.maxFileSizeMb * 1024 * 1024,
+      fileSizeLimit: bucketLimitMb * 1024 * 1024,
     });
     if (error && !/already exists/i.test(error.message)) {
       console.warn(`Bucket "${bucket}":`, error.message);

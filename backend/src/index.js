@@ -28,12 +28,26 @@ function isDevLanOrigin(origin) {
   );
 }
 
+function isLocalFrontendUrl() {
+  return isDevLanOrigin(config.frontendUrl);
+}
+
 app.use(cors({
   origin(origin, callback) {
+    // No Origin header — common with Vite dev proxy and server-to-server calls
+    if (!origin) {
+      return callback(null, true);
+    }
     if (config.nodeEnv === 'development' && isDevLanOrigin(origin)) {
       return callback(null, true);
     }
-    if (origin === config.frontendUrl) {
+    const normalizedOrigin = origin.replace(/\/$/, '');
+    const normalizedFrontend = config.frontendUrl.replace(/\/$/, '');
+    if (normalizedOrigin === normalizedFrontend) {
+      return callback(null, true);
+    }
+    // Local production testing (Neon/Supabase with NODE_ENV=production on localhost)
+    if (isLocalFrontendUrl() && isDevLanOrigin(origin)) {
       return callback(null, true);
     }
     callback(new Error('Not allowed by CORS'));

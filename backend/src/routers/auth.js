@@ -110,8 +110,6 @@ router.post(
       const { username, password, otp } = req.body;
       const email = normalizeEmail(req.body.email);
 
-      await verifyOtp({ email, purpose: 'register', otp });
-
       const existingUser = await query('SELECT id FROM users WHERE username = $1', [username.toLowerCase()]);
       if (existingUser.rows.length > 0) {
         throw new ValidationError('Username already taken');
@@ -122,10 +120,12 @@ router.post(
         throw new ValidationError('Email already registered');
       }
 
+      await verifyOtp({ email, purpose: 'register', otp });
+
       const hashed = await hashPassword(password);
       const result = await query(
         `INSERT INTO users (username, password, role, email, email_verified)
-         VALUES ($1, $2, 'student', $3, 1)
+         VALUES ($1, $2, 'student', $3, true)
          RETURNING id, username, role, email, email_verified, created_at`,
         [username.toLowerCase(), hashed, email]
       );
@@ -194,15 +194,15 @@ router.patch(
       const newEmail = normalizeEmail(req.body.new_email);
       const { otp } = req.body;
 
-      await verifyOtp({ email: newEmail, purpose: 'change_email', otp });
-
       const taken = await query('SELECT id FROM users WHERE email = $1 AND id != $2', [newEmail, req.user.sub]);
       if (taken.rows.length > 0) {
         throw new ValidationError('Email already registered');
       }
 
+      await verifyOtp({ email: newEmail, purpose: 'change_email', otp });
+
       const result = await query(
-        `UPDATE users SET email = $1, email_verified = 1 WHERE id = $2
+        `UPDATE users SET email = $1, email_verified = true WHERE id = $2
          RETURNING id, username, role, email, email_verified, created_at`,
         [newEmail, req.user.sub]
       );
