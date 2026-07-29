@@ -5,6 +5,7 @@ import { ProtectedRoute, PublicRoute } from './components/ProtectedRoute';
 import DashboardLayout from './layouts/DashboardLayout';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import StudentDashboard from './pages/student/StudentDashboard';
 import StudentAssignments from './pages/student/StudentAssignments';
 import AssignmentDetail from './pages/student/AssignmentDetail';
@@ -17,6 +18,8 @@ import UploadAssignment from './pages/teacher/UploadAssignment';
 import SubmissionList from './pages/teacher/SubmissionList';
 import StudentList from './pages/teacher/StudentList';
 import TeacherProfile from './pages/teacher/TeacherProfile';
+import TeacherSetupEmail from './pages/teacher/TeacherSetupEmail';
+import TeacherLayout from './layouts/TeacherLayout';
 
 export default function App() {
   return (
@@ -26,6 +29,7 @@ export default function App() {
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
           <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
+          <Route path="/forgot-password" element={<PublicRoute><ForgotPasswordPage /></PublicRoute>} />
 
           <Route path="/student" element={<ProtectedRoute role="student"><DashboardLayout /></ProtectedRoute>}>
             <Route index element={<StudentDashboard />} />
@@ -36,13 +40,16 @@ export default function App() {
             <Route path="profile" element={<StudentProfile />} />
           </Route>
 
-          <Route path="/teacher" element={<ProtectedRoute role="teacher"><DashboardLayout /></ProtectedRoute>}>
-            <Route index element={<TeacherDashboard />} />
-            <Route path="assignments" element={<ManageAssignments />} />
-            <Route path="upload" element={<UploadAssignment />} />
-            <Route path="submissions" element={<SubmissionList />} />
-            <Route path="students" element={<StudentList />} />
-            <Route path="profile" element={<TeacherProfile />} />
+          <Route path="/teacher" element={<ProtectedRoute role="teacher"><TeacherLayout /></ProtectedRoute>}>
+            <Route path="setup-email" element={<TeacherSetupEmail />} />
+            <Route element={<DashboardLayout />}>
+              <Route index element={<TeacherDashboard />} />
+              <Route path="assignments" element={<ManageAssignments />} />
+              <Route path="upload" element={<UploadAssignment />} />
+              <Route path="submissions" element={<SubmissionList />} />
+              <Route path="students" element={<StudentList />} />
+              <Route path="profile" element={<TeacherProfile />} />
+            </Route>
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />

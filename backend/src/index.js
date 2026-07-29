@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 import { config } from './config.js';
 import { errorHandler } from './middleware/errors.js';
 import { initStorage } from './services/storageService.js';
-import { isEmailConfigured } from './services/emailService.js';
+import { isEmailConfigured, getEmailStatus } from './services/emailService.js';
 
 import authRouter from './routers/auth.js';
 import assignmentsRouter from './routers/assignments.js';
@@ -61,12 +61,23 @@ await initStorage();
 
 if (isEmailConfigured()) {
   console.log('[email] Brevo SMTP configured.');
+  console.log(`[email] Sender (EMAIL_FROM): ${config.email.from}`);
+  console.log('[email] This address must be verified under Brevo → Senders & IP → Senders.');
 } else {
   console.log('[email] SMTP not set — OTP codes will print in the console.');
 }
 
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'Assignment Submission Portal API', version: '1.0.0' });
+  const email = getEmailStatus();
+  res.json({
+    status: 'ok',
+    service: 'Academy Assignment Portal API',
+    version: '1.0.0',
+    email: {
+      configured: email.configured,
+      mode: email.mode,
+    },
+  });
 });
 
 app.use('/api/auth', authRouter);
