@@ -20,18 +20,28 @@ api.interceptors.response.use(
   (error) => {
     if (!error.response) {
       return Promise.reject(new Error(
-        'Cannot reach the API server. Start the backend: cd backend && npm run dev'
+        'Cannot reach the API server. On mobile, use the same WiFi as the dev PC and start the backend: cd backend && npm run dev'
       ));
+    }
+    const status = error.response.status;
+    if (status === 502 || status === 503 || status === 504) {
+      return Promise.reject(new Error('Server is starting up. Wait a moment and try again.'));
     }
     const message = error.response?.data?.detail || error.message || 'Something went wrong';
     return Promise.reject(new Error(message));
   }
 );
 
+export const healthApi = {
+  check: () => api.get('/health'),
+};
+
 export const authApi = {
   login: (data) => api.post('/auth/login', data),
   register: (data) => api.post('/auth/register', data),
   sendRegisterOtp: (email) => api.post('/auth/otp/send/register', { email }),
+  sendForgotPasswordOtp: (email) => api.post('/auth/otp/send/forgot-password', { email }),
+  resetPassword: (data) => api.post('/auth/reset-password', data),
   sendChangeEmailOtp: (email) => api.post('/auth/otp/send/change-email', { email }),
   sendChangePasswordOtp: () => api.post('/auth/otp/send/change-password'),
   updateEmail: (data) => api.patch('/auth/account/email', data),

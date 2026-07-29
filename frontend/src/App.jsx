@@ -5,6 +5,7 @@ import { ProtectedRoute, PublicRoute } from './components/ProtectedRoute';
 import DashboardLayout from './layouts/DashboardLayout';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import StudentDashboard from './pages/student/StudentDashboard';
 import StudentAssignments from './pages/student/StudentAssignments';
 import AssignmentDetail from './pages/student/AssignmentDetail';
@@ -26,6 +27,7 @@ export default function App() {
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
           <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
+          <Route path="/forgot-password" element={<PublicRoute><ForgotPasswordPage /></PublicRoute>} />
 
           <Route path="/student" element={<ProtectedRoute role="student"><DashboardLayout /></ProtectedRoute>}>
             <Route index element={<StudentDashboard />} />

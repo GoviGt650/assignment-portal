@@ -994,4 +994,72 @@ Downloads use human-readable names instead of server-generated UUID filenames:
 
 ---
 
-*Documentation version: 1.1 — Academy Assignment Portal*
+## 19. Email OTP, Notifications & Collaboration (v1.2)
+
+### Email OTP (Brevo SMTP)
+
+Students verify email during registration. OTP codes expire in **10 minutes** with a **60s resend cooldown**.
+
+| Purpose | Endpoint | Who |
+|---------|----------|-----|
+| Registration | `POST /api/auth/otp/send/register` | Public |
+| Forgot password | `POST /api/auth/otp/send/forgot-password` | Public |
+| Change email | `POST /api/auth/otp/send/change-email` | Student (logged in) |
+| Change password | `POST /api/auth/otp/send/change-password` | Student (logged in) |
+
+**Dev fallback:** If `SMTP_USER` / `SMTP_PASS` are missing, codes print as `[DEV OTP]` in the backend terminal. API responses include `dev_mode: true`.
+
+**Setup:** Run `npm run setup:env` in `backend/` or copy `.env.example` → `.env`.
+
+### Forgot password flow
+
+1. Student opens `/forgot-password`
+2. Enters registered email → OTP sent
+3. `POST /api/auth/reset-password` with email, OTP, new password
+
+### Teacher submission notifications
+
+When a student submits or updates work, the API emails the teacher if configured:
+
+```env
+TEACHER_NOTIFY_EMAIL=teacher@gmail.com
+```
+
+Without this, the app tries the first teacher user with an email in the database. In dev mode, notifications log as `[DEV NOTIFY]`.
+
+### Health check
+
+`GET /api/health` returns:
+
+```json
+{
+  "status": "ok",
+  "email": { "configured": true, "mode": "smtp" }
+}
+```
+
+`mode` is `smtp` or `dev-fallback` (no secrets exposed).
+
+### Git branch workflow
+
+| Branch | Use |
+|--------|-----|
+| `development` | Daily work — **push here** |
+| `staging` | Integration testing |
+| `main` | Production releases |
+
+See [CONTRIBUTING.md](../CONTRIBUTING.md). Do not commit `.env`, `data/`, or `*.db`.
+
+### New frontend components
+
+| Component | Purpose |
+|-----------|---------|
+| `OtpResendControl.jsx` | Resend button with countdown progress bar |
+| `DevOtpNotice.jsx` | Banner when SMTP not configured |
+| `ApiErrorState.jsx` | Mobile-friendly API error + retry |
+| `useAsyncLoad.js` | Dashboard fetch with error handling |
+| `ForgotPasswordPage.jsx` | Student password reset |
+
+---
+
+*Documentation version: 1.2 — Academy Assignment Portal*

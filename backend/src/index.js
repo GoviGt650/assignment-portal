@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 import { config } from './config.js';
 import { errorHandler } from './middleware/errors.js';
 import { initStorage } from './services/storageService.js';
-import { isEmailConfigured } from './services/emailService.js';
+import { isEmailConfigured, getEmailStatus } from './services/emailService.js';
 
 import authRouter from './routers/auth.js';
 import assignmentsRouter from './routers/assignments.js';
@@ -52,7 +52,16 @@ if (isEmailConfigured()) {
 }
 
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'Assignment Submission Portal API', version: '1.0.0' });
+  const email = getEmailStatus();
+  res.json({
+    status: 'ok',
+    service: 'Academy Assignment Portal API',
+    version: '1.0.0',
+    email: {
+      configured: email.configured,
+      mode: email.mode,
+    },
+  });
 });
 
 app.use('/api/auth', authRouter);

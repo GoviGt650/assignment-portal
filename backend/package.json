@@ -9,7 +9,8 @@
     "dev": "node --watch src/index.js",
     "db:init": "node src/scripts/initDb.js",
     "db:seed": "node src/scripts/seed.js",
-    "db:reset-teacher": "node src/scripts/resetTeacher.js"
+    "db:reset-teacher": "node src/scripts/resetTeacher.js",
+    "setup:env": "node src/scripts/setupEnv.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.8",

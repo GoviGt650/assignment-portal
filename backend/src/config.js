@@ -31,6 +31,7 @@ export const config = {
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
   email: {
     from: process.env.EMAIL_FROM || 'Academy ASP <noreply@example.com>',
+    teacherNotify: process.env.TEACHER_NOTIFY_EMAIL || '',
     smtp: {
       host: process.env.SMTP_HOST || 'smtp-relay.brevo.com',
       port: parseInt(process.env.SMTP_PORT || '587', 10),

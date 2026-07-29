@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import AuthBrandPanel from '../components/AuthBrandPanel';
 import OtpInput, { PasswordStrength } from '../components/OtpInput';
+import OtpResendControl, { DevOtpNotice } from '../components/OtpResendControl';
 import { authApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
@@ -76,6 +77,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
+  const [devMode, setDevMode] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const { register } = useAuth();
   const navigate = useNavigate();
@@ -95,6 +97,7 @@ export default function RegisterPage() {
     try {
       const { data } = await authApi.sendRegisterOtp(email.trim());
       setOtpSent(true);
+      setDevMode(Boolean(data.dev_mode));
       setCooldown(60);
       toast.success(data.message);
     } catch (err) {
@@ -212,6 +215,7 @@ export default function RegisterPage() {
                       onChange={(e) => {
                         setEmail(e.target.value);
                         setOtpSent(false);
+                        setDevMode(false);
                         setOtp('');
                       }}
                       placeholder="you@example.com"
@@ -222,14 +226,15 @@ export default function RegisterPage() {
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleSendOtp}
-                  disabled={sendingOtp || cooldown > 0 || !email.trim()}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-brand-200 bg-white py-3.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {cooldown > 0 ? `Resend code in ${cooldown}s` : sendingOtp ? 'Sending code...' : otpSent ? 'Resend verification code' : 'Send verification code'}
-                </button>
+                <DevOtpNotice visible={devMode} />
+
+                <OtpResendControl
+                  onSend={handleSendOtp}
+                  sending={sendingOtp}
+                  sent={otpSent}
+                  cooldown={cooldown}
+                  disabled={!email.trim()}
+                />
 
                 <div>
                   <label className="mb-3 block text-sm font-medium text-slate-700">
@@ -237,9 +242,11 @@ export default function RegisterPage() {
                   </label>
                   <OtpInput value={otp} onChange={setOtp} disabled={!otpSent} />
                   <p className="mt-3 text-xs leading-relaxed text-slate-500">
-                    {otpSent
-                      ? 'Check your inbox and spam folder. The code expires in 10 minutes.'
-                      : 'Send a code first, then enter it here to continue.'}
+                    {devMode
+                      ? 'Development mode: ask the person running the backend for the code in the terminal.'
+                      : otpSent
+                        ? 'Check your inbox and spam folder. The code expires in 10 minutes.'
+                        : 'Send a code first, then enter it here to continue.'}
                   </p>
                 </div>
 

@@ -1,0 +1,14 @@
+---
+description: Git branch workflow — commit and push only to development
+alwaysApply: true
+---
+
+# Git branch workflow
+
+- **Default working branch:** `development`
+- **Commit and push target:** `origin/development` only
+- **Do NOT** commit, push, merge, or force-push to `main` or `staging` unless the user explicitly asks for that branch by name
+- Before pushing, verify current branch: `git branch --show-current` should be `development`
+- If not on `development`, checkout first: `git checkout development`
+- Pull latest before new work: `git pull origin development`
+- Push with: `git push origin development` (use `-u` only when setting upstream for a new local branch)

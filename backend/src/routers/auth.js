@@ -20,6 +20,16 @@ function normalizeEmail(email) {
   return email.trim().toLowerCase();
 }
 
+function otpResponse(sent, message, email, extra = {}) {
+  return {
+    message,
+    email,
+    expires_in_minutes: 10,
+    dev_mode: sent.dev,
+    ...extra,
+  };
+}
+
 router.post(
   '/otp/send/register',
   [body('email').trim().isEmail().withMessage('Valid email is required')],
@@ -33,13 +43,13 @@ router.post(
       }
       const code = await createOtp({ email, purpose: 'register' });
       const sent = await sendOtpEmail(email, code, 'register');
-      res.json({
-        message: sent.dev
-          ? 'Verification code generated. Check the backend console in development.'
+      res.json(otpResponse(
+        sent,
+        sent.dev
+          ? 'Development mode: code printed in backend terminal (SMTP not configured).'
           : 'Verification code sent to your email.',
-        email,
-        expires_in_minutes: 10,
-      });
+        email
+      ));
     } catch (err) {
       next(err);
     }
@@ -61,11 +71,11 @@ router.post(
       }
       const code = await createOtp({ email, purpose: 'change_email', userId: req.user.sub });
       const sent = await sendOtpEmail(email, code, 'change_email');
-      res.json({
-        message: sent.dev ? 'Code generated. Check the backend console.' : 'Code sent to your new email.',
-        email,
-        expires_in_minutes: 10,
-      });
+      res.json(otpResponse(
+        sent,
+        sent.dev ? 'Development mode: code printed in backend terminal.' : 'Code sent to your new email.',
+        email
+      ));
     } catch (err) {
       next(err);
     }
@@ -85,11 +95,78 @@ router.post(
       }
       const code = await createOtp({ email, purpose: 'change_password', userId: req.user.sub });
       const sent = await sendOtpEmail(email, code, 'change_password');
-      res.json({
-        message: sent.dev ? 'Code generated. Check the backend console.' : 'Code sent to your registered email.',
-        email,
-        expires_in_minutes: 10,
-      });
+      res.json(otpResponse(
+        sent,
+        sent.dev ? 'Development mode: code printed in backend terminal.' : 'Code sent to your registered email.',
+        email
+      ));
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.post(
+  '/otp/send/forgot-password',
+  [body('email').trim().isEmail().withMessage('Valid email is required')],
+  async (req, res, next) => {
+    try {
+      validate(req);
+      const email = normalizeEmail(req.body.email);
+      const userResult = await query(
+        `SELECT id, email, role FROM users WHERE email = $1 AND role = 'student'`,
+        [email]
+      );
+
+      const genericMessage = 'If a student account exists for this email, a reset code has been sent.';
+
+      if (userResult.rows.length === 0) {
+        return res.json({ message: genericMessage, email, dev_mode: false });
+      }
+
+      const user = userResult.rows[0];
+      const code = await createOtp({ email, purpose: 'forgot_password', userId: user.id });
+      const sent = await sendOtpEmail(email, code, 'forgot_password');
+      res.json(otpResponse(sent, genericMessage, email));
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.post(
+  '/reset-password',
+  [
+    body('email').trim().isEmail().withMessage('Valid email is required'),
+    body('otp').trim().isLength({ min: 6, max: 6 }).withMessage('Enter the 6-digit verification code'),
+    body('new_password').isLength({ min: 6 }).withMessage('New password must be at least 6 characters'),
+    body('confirm_password').custom((value, { req }) => {
+      if (value !== req.body.new_password) {
+        throw new Error('Passwords do not match');
+      }
+      return true;
+    }),
+  ],
+  async (req, res, next) => {
+    try {
+      validate(req);
+      const email = normalizeEmail(req.body.email);
+      const { otp, new_password: newPassword } = req.body;
+
+      await verifyOtp({ email, purpose: 'forgot_password', otp });
+
+      const userResult = await query(
+        `SELECT id FROM users WHERE email = $1 AND role = 'student'`,
+        [email]
+      );
+      if (userResult.rows.length === 0) {
+        throw new ValidationError('No student account found for this email');
+      }
+
+      const nextPasswordHash = await hashPassword(newPassword);
+      await query('UPDATE users SET password = $1 WHERE id = $2', [nextPasswordHash, userResult.rows[0].id]);
+
+      res.json({ message: 'Password reset successfully. You can sign in with your new password.' });
     } catch (err) {
       next(err);
     }
