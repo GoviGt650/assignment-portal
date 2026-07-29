@@ -38,7 +38,7 @@ export default function LoginPage() {
                 <BookOpen size={22} />
               </div>
               <div>
-                <p className="font-bold text-slate-900">Terralogic ASP</p>
+                <p className="font-bold text-slate-900">Academy ASP</p>
                 <p className="text-xs text-slate-500">Assignment Portal</p>
               </div>
             </div>

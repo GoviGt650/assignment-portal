@@ -1,6 +1,6 @@
 # Free Deployment Guide — Always Available for Teacher & Students
 
-This guide deploys **Terralogic Assignment Portal** at **$0/month** so your teacher and classmates can access it from anywhere via a public URL.
+This guide deploys **Academy Assignment Portal** at **$0/month** so your teacher and classmates can access it from anywhere via a public URL.
 
 ---
 
@@ -300,7 +300,7 @@ SMTP_HOST=smtp-relay.brevo.com
 SMTP_PORT=587
 SMTP_USER=xxxxxxxxxx@smtp-brevo.com
 SMTP_PASS=your-brevo-smtp-key
-EMAIL_FROM=Terralogic ASP <your-login@gmail.com>
+EMAIL_FROM=Academy ASP <your-login@gmail.com>
 ```
 
 - `SMTP_USER` = the **Login** field on Brevo’s SMTP page (`xxx@smtp-brevo.com`)
@@ -326,7 +326,7 @@ SMTP_HOST=smtp-relay.brevo.com
 SMTP_PORT=587
 SMTP_USER=xxxxxxxxxx@smtp-brevo.com
 SMTP_PASS=your-brevo-smtp-key
-EMAIL_FROM=Terralogic ASP <your-email@gmail.com>
+EMAIL_FROM=Academy ASP <your-email@gmail.com>
 PORT=8000
 ```
 

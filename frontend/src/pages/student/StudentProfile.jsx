@@ -81,7 +81,7 @@ function ProfileHero({ user }) {
             </div>
             <div className="pb-1">
               <h2 className="text-xl font-bold text-slate-900">{user.username}</h2>
-              <p className="mt-1 text-sm text-slate-500">Terralogic ASP · Student</p>
+              <p className="mt-1 text-sm text-slate-500">Academy ASP · Student</p>
             </div>
           </div>
           <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">

@@ -1,4 +1,4 @@
-# Terralogic Assignment Portal
+# Academy Assignment Portal
 
 A centralized **Assignment Submission Portal (ASP)** for teachers and students. Replace WhatsApp PDF sharing and manual Git tracking with a single web app for publishing assignments, submitting work, and tracking submissions.
 
@@ -117,7 +117,7 @@ App runs at **http://localhost:5173**
 | `SMTP_PORT` | SMTP port (default `587`) |
 | `SMTP_USER` | Brevo **SMTP login** from dashboard (format `xxx@smtp-brevo.com`) — not your Gmail |
 | `SMTP_PASS` | Brevo SMTP key (from SMTP & API in dashboard) |
-| `EMAIL_FROM` | Verified sender, e.g. `Terralogic ASP <your-email@gmail.com>` |
+| `EMAIL_FROM` | Verified sender, e.g. `Academy ASP <your-email@gmail.com>` |
 
 ### Frontend (`frontend/.env`)
 

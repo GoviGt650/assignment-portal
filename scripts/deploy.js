@@ -47,7 +47,7 @@ const repoUrl = env.GITHUB_REPO_URL.replace('https://github.com/', 'https://' + 
 run('git init');
 run('git add .');
 try {
-  run('git commit -m "Deploy Terralogic Assignment Portal"');
+  run('git commit -m "Deploy Academy Assignment Portal"');
 } catch {
   console.log('Nothing new to commit or commit failed — continuing');
 }
