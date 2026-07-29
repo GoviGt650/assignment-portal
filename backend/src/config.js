@@ -32,6 +32,7 @@ export const config = {
   email: {
     from: process.env.EMAIL_FROM || 'Academy ASP <noreply@example.com>',
     teacherNotify: process.env.TEACHER_NOTIFY_EMAIL || '',
+    brevoApiKey: process.env.BREVO_API_KEY || '',
     smtp: {
       host: process.env.SMTP_HOST || 'smtp-relay.brevo.com',
       port: parseInt(process.env.SMTP_PORT || '587', 10),
