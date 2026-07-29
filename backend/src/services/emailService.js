@@ -40,7 +40,7 @@ function buildEmailHtml(otp, label) {
               <table width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;border:1px solid #e2e8f0;overflow:hidden">
                 <tr>
                   <td style="background:linear-gradient(135deg,#2563eb,#1d4ed8);padding:28px 32px">
-                    <p style="margin:0;color:#dbeafe;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase">Terralogic ASP</p>
+                    <p style="margin:0;color:#dbeafe;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase">Academy ASP</p>
                     <h1 style="margin:8px 0 0;color:#ffffff;font-size:24px;line-height:1.3">Verification code</h1>
                   </td>
                 </tr>
@@ -68,8 +68,8 @@ function buildEmailHtml(otp, label) {
 
 export async function sendOtpEmail(to, otp, purpose) {
   const label = purposeLabels[purpose] || 'verify your request';
-  const subject = `${otp} - Terralogic ASP verification code`;
-  const text = `Your Terralogic ASP verification code is ${otp}. Use it to ${label}. Expires in 10 minutes.`;
+  const subject = `${otp} - Academy ASP verification code`;
+  const text = `Your Academy ASP verification code is ${otp}. Use it to ${label}. Expires in 10 minutes.`;
 
   const transport = getTransporter();
   if (!transport) {

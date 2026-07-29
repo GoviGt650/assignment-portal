@@ -32,7 +32,7 @@ export default function AuthBrandPanel({
             <BookOpen size={20} />
           </div>
           <div>
-            <p className="text-sm font-semibold text-white">Terralogic ASP</p>
+            <p className="text-sm font-semibold text-white">Academy ASP</p>
             <p className="text-xs text-slate-200">Assignment Submission Portal</p>
           </div>
         </div>

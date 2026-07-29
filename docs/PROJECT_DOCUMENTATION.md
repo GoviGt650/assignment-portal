@@ -1,4 +1,4 @@
-# Terralogic Assignment Portal — Project Documentation
+# Academy Assignment Portal — Project Documentation
 
 > **Purpose of this document:** A complete study guide for understanding how this full-stack project is built, how the frontend and backend connect, how API calls work, and how data flows through the system.
 
@@ -33,7 +33,7 @@
 Assignments were shared on WhatsApp as PDFs. Students downloaded files, pushed code to Git, and submitted manually. Teachers had no central way to track submissions.
 
 ### Solution
-**Terralogic Assignment Portal (ASP)** is a web application with two roles:
+**Academy Assignment Portal (ASP)** is a web application with two roles:
 
 | Role | Can Do |
 |------|--------|
@@ -994,4 +994,4 @@ Downloads use human-readable names instead of server-generated UUID filenames:
 
 ---
 
-*Documentation version: 1.1 — Terralogic Assignment Portal*
+*Documentation version: 1.1 — Academy Assignment Portal*
