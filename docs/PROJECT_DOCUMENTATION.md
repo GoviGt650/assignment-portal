@@ -604,6 +604,13 @@ Authorization: Bearer <your_jwt_token>
 { "username": "teacher", "password": "teacher123" }
 ```
 
+Also accepts registered **email** in the `username` field:
+```json
+{ "username": "student@school.edu", "password": "your-password" }
+```
+
+If the value contains `@`, it is matched against `users.email`; otherwise against `users.username`.
+
 **POST /login — Response:**
 ```json
 {

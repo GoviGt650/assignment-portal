@@ -149,7 +149,7 @@ App runs at **http://localhost:5173**
 | POST | `/api/auth/forgot-password/lookup` | Lookup account for password reset |
 | POST | `/api/auth/otp/send/forgot-password` | Send reset OTP (students and teachers with email) |
 | POST | `/api/auth/reset-password` | Reset password with OTP |
-| POST | `/api/auth/login` | Login |
+| POST | `/api/auth/login` | Login with username **or** registered email |
 | GET | `/api/auth/me` | Current user |
 | GET | `/api/assignments` | List assignments |
 | POST | `/api/assignments` | Create assignment (teacher) |

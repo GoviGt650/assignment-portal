@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { ArrowRight, BookOpen, Lock, User } from 'lucide-react';
+import { ArrowRight, BookOpen, Lock, Mail } from 'lucide-react';
 import AuthBrandPanel from '../components/AuthBrandPanel';
 import { useAuth } from '../context/AuthContext';
 import { teacherHomePath } from '../layouts/TeacherLayout';
 
 export default function LoginPage() {
-  const [username, setUsername] = useState('');
+  const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
@@ -17,7 +17,7 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const user = await login({ username, password });
+      const user = await login({ username: loginId.trim(), password });
       toast.success(`Welcome back, ${user.username}!`);
       navigate(teacherHomePath(user));
     } catch (err) {
@@ -48,22 +48,22 @@ export default function LoginPage() {
           <div className="rounded-3xl border border-slate-200/80 bg-white p-8 shadow-xl shadow-slate-200/50 sm:p-10">
             <div className="mb-8">
               <h2 className="text-2xl font-bold tracking-tight text-slate-900">Welcome back</h2>
-              <p className="mt-2 text-slate-500">Sign in to your account to continue</p>
+              <p className="mt-2 text-slate-500">Sign in with your username or email</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label htmlFor="username" className="mb-2 block text-sm font-medium text-slate-700">
-                  Username
+                <label htmlFor="login-id" className="mb-2 block text-sm font-medium text-slate-700">
+                  Username or email
                 </label>
                 <div className="relative">
-                  <User className="pointer-events-none absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-slate-400" />
+                  <Mail className="pointer-events-none absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-slate-400" />
                   <input
-                    id="username"
+                    id="login-id"
                     type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Enter your username"
+                    value={loginId}
+                    onChange={(e) => setLoginId(e.target.value)}
+                    placeholder="Username or email address"
                     autoComplete="username"
                     className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-3.5 pl-11 pr-4 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10"
                     required
