@@ -712,12 +712,26 @@ Status values: `pending`, `submitted`, `reviewed`, `late`
 
 ### Files (`/api/files`)
 
+**Architecture (always use this pattern):**
+
+```
+Browser  →  GET /api/files/... + JWT  →  Render API  →  Supabase / disk  →  file bytes
+```
+
+The frontend **never** talks to Supabase or disk directly. The database stores relative paths like `/api/files/assignments/1730-homework.pdf`. Preview and download both go through the backend with the user's JWT.
+
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| GET | `/assignments/:filename` | Yes | Download or preview assignment PDF |
-| GET | `/submissions/:filename` | Yes | Download or preview student submission |
+| GET | `/assignments/:filename` | Yes | Stream assignment PDF from storage |
+| GET | `/submissions/:filename` | Yes | Stream student submission from storage |
 
-Both endpoints stream files with correct `Content-Type` headers. The frontend uses `fetchFileBlob()` for inline preview (PDF, images, text) and `downloadFile()` with custom filenames.
+**Frontend:** `resolveFileUrl()` turns DB paths into the full Render URL in production (`VITE_API_URL` must be set on Vercel, e.g. `https://your-api.onrender.com/api`). `fetchFileBlob()` and `downloadFile()` attach `Authorization: Bearer <token>`.
+
+**Backend:** `files.js` → `streamFile()` → Supabase bucket (production) or local `uploads/` (dev). Logs: `[files]`, `[storage]`.
+
+**Production env (Render):** `STORAGE_TYPE=supabase`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
+
+**Production env (Vercel):** `VITE_API_URL=https://your-api.onrender.com/api` — required so file requests hit Render, not the Vercel SPA.
 
 ---
 
@@ -804,14 +818,12 @@ URL stored in database (pdf_url or uploaded_file column)
 
 ### Downloading and previewing files
 
-Frontend uses helpers in `api.js`:
+All file access goes through the backend API (JWT required). Never fetch Supabase URLs from the browser.
 
 ```javascript
-// Named download (e.g. studentname_assignment-title.zip)
-downloadFile(url, buildSubmissionDownloadName(username, title, url))
-
-// Inline preview in FilePreviewModal
-fetchFileBlob(url) → blob URL → iframe/img/pre tag
+// resolveFileUrl('/api/files/...') → full Render URL in production
+// fetchFileBlob(url) → GET + Bearer token → blob for preview
+// downloadFile(url, filename) → same fetch, then browser download
 ```
 
 Assignment PDFs download with the assignment title as filename. Files require authentication — students cannot access other students' submissions.

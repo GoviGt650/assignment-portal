@@ -75,7 +75,12 @@ export async function saveFile(type, file) {
     contentType: file.mimetype || 'application/octet-stream',
     upsert: false,
   });
-  if (error) throw new ValidationError(`Upload failed: ${error.message}`);
+  if (error) {
+    console.error(`[storage] Supabase upload failed bucket=${bucket} file=${name}:`, error.message);
+    throw new ValidationError(`Upload failed: ${error.message}`);
+  }
+
+  console.log(`[storage] uploaded ${bucket}/${name} (${buffer.length} bytes)`);
 
   return { filename: name, url: buildPublicUrl(type, name) };
 }
@@ -118,9 +123,19 @@ export async function streamFile(urlType, filename, res, options = {}) {
   const safeName = path.basename(filename);
 
   const { data, error } = await client.storage.from(urlType).download(safeName);
-  if (error || !data) return false;
+  if (error || !data) {
+    console.error(
+      `[storage] Supabase download failed bucket=${urlType} file=${safeName}:`,
+      error?.message || 'no data returned'
+    );
+    return false;
+  }
 
   const buffer = Buffer.from(await data.arrayBuffer());
+  if (buffer.length === 0) {
+    console.error(`[storage] Supabase file empty bucket=${urlType} file=${safeName}`);
+    return false;
+  }
   const contentType = data.type || 'application/octet-stream';
   const outputName = downloadName || safeName;
 

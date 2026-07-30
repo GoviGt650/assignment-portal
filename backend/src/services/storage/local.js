@@ -90,6 +90,7 @@ export async function streamFile(urlType, filename, res, options = {}) {
   const safeName = path.basename(filename);
   const filePath = path.join(dir, safeName);
   if (!fsSync.existsSync(filePath)) {
+    console.warn(`[storage] local file missing ${filePath}`);
     return false;
   }
 

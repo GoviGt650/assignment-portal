@@ -132,7 +132,7 @@ App runs at **http://localhost:5173**
 
 | Variable | Description |
 |----------|-------------|
-| `VITE_API_URL` | Backend API base URL (use `/api` locally with Vite proxy) |
+| `VITE_API_URL` | Backend API base URL — **required in production** (e.g. `https://your-api.onrender.com/api`). Used for JSON API and file preview/download. |
 
 ## API Endpoints
 
