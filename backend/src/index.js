@@ -50,6 +50,7 @@ app.use(cors({
     if (isLocalFrontendUrl() && isDevLanOrigin(origin)) {
       return callback(null, true);
     }
+    console.warn(`[cors] blocked origin="${origin}" expected="${config.frontendUrl}"`);
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
@@ -58,6 +59,15 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 await initStorage();
+
+console.log(`[storage] mode=${config.storage.type}`);
+if (config.storage.type === 'supabase') {
+  if (!config.supabase.url || !config.supabase.serviceKey) {
+    console.error('[storage] STORAGE_TYPE=supabase but SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is missing');
+  }
+} else if (config.storage.type === 'local' && config.nodeEnv === 'production') {
+  console.warn('[storage] STORAGE_TYPE=local on production — uploaded files are lost on redeploy. Use supabase.');
+}
 
 if (isEmailConfigured()) {
   const emailMode = getEmailStatus().mode;
@@ -77,6 +87,10 @@ app.get('/api/health', (_req, res) => {
     status: 'ok',
     service: 'Academy Assignment Portal API',
     version: '1.0.0',
+    storage: {
+      type: config.storage.type,
+      supabase_configured: Boolean(config.supabase.url && config.supabase.serviceKey),
+    },
     email: {
       configured: email.configured,
       mode: email.mode,
