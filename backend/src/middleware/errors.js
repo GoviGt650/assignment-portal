@@ -35,9 +35,13 @@ export function errorHandler(err, req, res, next) {
 
   const status = err.statusCode || 500;
   const message = err.message || 'Internal server error';
+  const route = `${req.method} ${req.originalUrl}`;
 
-  if (process.env.NODE_ENV !== 'production') {
-    console.error(err);
+  if (status >= 500) {
+    console.error(`[error] ${route} → ${status} ${message}`);
+    if (err.stack) console.error(err.stack);
+  } else if (status >= 400) {
+    console.warn(`[error] ${route} → ${status} ${message}`);
   }
 
   res.status(status).json({

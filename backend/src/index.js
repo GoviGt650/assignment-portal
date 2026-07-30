@@ -50,6 +50,7 @@ app.use(cors({
     if (isLocalFrontendUrl() && isDevLanOrigin(origin)) {
       return callback(null, true);
     }
+    console.warn(`[cors] blocked origin="${origin}" expected="${config.frontendUrl}"`);
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
@@ -59,10 +60,23 @@ app.use(express.urlencoded({ extended: true }));
 
 await initStorage();
 
+console.log(`[storage] mode=${config.storage.type}`);
+if (config.storage.type === 'supabase') {
+  if (!config.supabase.url || !config.supabase.serviceKey) {
+    console.error('[storage] STORAGE_TYPE=supabase but SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is missing');
+  }
+} else if (config.storage.type === 'local' && config.nodeEnv === 'production') {
+  console.warn('[storage] STORAGE_TYPE=local on production — uploaded files are lost on redeploy. Use supabase.');
+}
+
 if (isEmailConfigured()) {
-  console.log('[email] Brevo SMTP configured.');
+  const emailMode = getEmailStatus().mode;
+  console.log(`[email] Brevo configured (${emailMode}).`);
   console.log(`[email] Sender (EMAIL_FROM): ${config.email.from}`);
   console.log('[email] This address must be verified under Brevo → Senders & IP → Senders.');
+  if (emailMode === 'smtp') {
+    console.log('[email] Tip: on Render, prefer BREVO_API_KEY over SMTP to avoid connection timeouts.');
+  }
 } else {
   console.log('[email] SMTP not set — OTP codes will print in the console.');
 }
@@ -73,6 +87,10 @@ app.get('/api/health', (_req, res) => {
     status: 'ok',
     service: 'Academy Assignment Portal API',
     version: '1.0.0',
+    storage: {
+      type: config.storage.type,
+      supabase_configured: Boolean(config.supabase.url && config.supabase.serviceKey),
+    },
     email: {
       configured: email.configured,
       mode: email.mode,

@@ -327,24 +327,36 @@ router.post(
   }
 );
 
+async function findUserByLogin(identifier) {
+  const value = identifier.trim();
+  if (!value) return null;
+
+  if (value.includes('@')) {
+    const result = await query('SELECT * FROM users WHERE email = $1', [normalizeEmail(value)]);
+    return result.rows[0] || null;
+  }
+
+  const result = await query('SELECT * FROM users WHERE username = $1', [value.toLowerCase()]);
+  return result.rows[0] || null;
+}
+
 router.post(
   '/login',
   [
-    body('username').trim().notEmpty().withMessage('Username is required'),
+    body('username').trim().notEmpty().withMessage('Username or email is required'),
     body('password').notEmpty().withMessage('Password is required'),
   ],
   async (req, res, next) => {
     try {
       validate(req);
-      const { username, password } = req.body;
-      const result = await query('SELECT * FROM users WHERE username = $1', [username.toLowerCase()]);
-      if (result.rows.length === 0) {
-        throw new AuthError('Invalid username or password');
+      const { username: loginId, password } = req.body;
+      const user = await findUserByLogin(loginId);
+      if (!user) {
+        throw new AuthError('Invalid username, email, or password');
       }
-      const user = result.rows[0];
       const valid = await verifyPassword(password, user.password);
       if (!valid) {
-        throw new AuthError('Invalid username or password');
+        throw new AuthError('Invalid username, email, or password');
       }
       const token = createToken(user);
       res.json({ access_token: token, token_type: 'bearer', user: publicUser(user) });

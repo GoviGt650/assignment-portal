@@ -96,22 +96,64 @@ export const dashboardApi = {
 export function resolveFileUrl(url) {
   if (!url) return '';
   if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  if (url.startsWith('/api')) return url;
-  const base = API_URL.replace(/\/api\/?$/, '');
-  return `${base}${url.startsWith('/') ? url : `/${url}`}`;
+
+  const apiRoot = API_URL.replace(/\/api\/?$/, '');
+  const path = url.startsWith('/api')
+    ? url
+    : (url.startsWith('/') ? url : `/${url}`);
+
+  // Local dev: API_URL=/api → relative path (Vite proxy). Production: full Render URL.
+  return apiRoot ? `${apiRoot}${path}` : path;
 }
 
 export async function fetchFileBlob(url) {
   const token = localStorage.getItem('token');
-  const res = await fetch(resolveFileUrl(url), {
+  const fileUrl = resolveFileUrl(url);
+
+  const res = await fetch(fileUrl, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) throw new Error('Could not load file');
+
+  const contentType = res.headers.get('Content-Type') || '';
+
+  if (!res.ok) {
+    let detail = 'Could not load file';
+    try {
+      const body = await res.json();
+      detail = body.detail || detail;
+    } catch {
+      // response was not JSON
+    }
+    throw new Error(`${detail} (${res.status})`);
+  }
+
   const blob = await res.blob();
-  return {
-    blob,
-    contentType: res.headers.get('Content-Type') || blob.type || 'application/octet-stream',
-  };
+  const type = contentType || blob.type || 'application/octet-stream';
+
+  if (blob.size === 0) {
+    throw new Error('File is empty — it may not have been uploaded correctly.');
+  }
+
+  if (type.includes('text/html')) {
+    throw new Error(
+      'File request returned a web page instead of the file. Check VITE_API_URL points to your backend API.'
+    );
+  }
+
+  if (type.includes('application/json')) {
+    const text = await blob.text();
+    try {
+      const parsed = JSON.parse(text);
+      throw new Error(parsed.detail || 'Could not load file');
+    } catch (err) {
+      if (err instanceof Error && err.message !== 'Unexpected token') {
+        throw err;
+      }
+      throw new Error('Could not load file');
+    }
+  }
+
+  return { blob, contentType: type };
 }
 
 export function downloadFile(url, filename) {
